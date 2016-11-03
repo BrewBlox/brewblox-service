@@ -1,0 +1,13 @@
+SQLAlchemy==1.1.3
+Flask==0.11.1
+Flask-SQLAlchemy==2.1
+Flask-admin
+celery
+
+-e git+https://github.com/m-mcgowan/controlbox-connect-py.git@feature/issue4#egg=controlbox-connect-py
+
+# dev
+pytest
+pytest-flask
+pytest-sugar
+pytest-flake8
