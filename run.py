@@ -4,7 +4,7 @@ from brewpi_service.tasks import run_synchers
 import logging
 import coloredlogs
 
-logger = logging.getLogger('service')
+logger = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG')
 
 synchers_loop = run_synchers()

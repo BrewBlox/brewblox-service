@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.declarative import declarative_base
 
 engine = create_engine('sqlite:///brewpi-service.db', convert_unicode=True)
@@ -16,3 +17,25 @@ def init_db():
     # you will have to import them first before calling init_db()
     from .controller import models # NOQA
     Base.metadata.create_all(bind=engine)
+
+
+def get_or_create(session,
+                  model,
+                  create_method='',
+                  create_method_kwargs=None,
+                  **kwargs):
+    """
+    Shortcut to get or create an object
+    """
+    try:
+        return session.query(model).filter_by(**kwargs).one(), True
+    except NoResultFound:
+        kwargs.update(create_method_kwargs or {})
+        created = getattr(model, create_method, model)(**kwargs)
+        try:
+            session.add(created)
+            session.commit()
+            return created, False
+        except IntegrityError:
+            session.rollback()
+            return session.query(model).filter_by(**kwargs).one(), True

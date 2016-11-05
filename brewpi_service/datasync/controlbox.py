@@ -11,9 +11,14 @@ from controlbox.controller import Controlbox
 from controlbox.events import (
     ControlboxEvents, ConnectorCodec, ConnectorEventVisitor
 )
+
+from controlbox.connector.base import (
+    ConnectorConnectedEvent, ConnectorDisconnectedEvent
+)
 from controlbox.protocol.controlbox import ControlboxProtocolV1
 from controlbox.connector.socketconn import TCPServerEndpoint
 
+from .database import DatabaseSyncher
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,16 +33,14 @@ def sniffer(conduit):
     return determine_line_protocol(conduit, all_sniffers)
 
 
-class ControlboxSyncher:
+class ControlboxSyncher(DatabaseSyncher):
     """
     A loop that syncs to the controller using Controlbox/Connector
     """
     discoveries = [
         ControllerDiscoveryFacade.build_serial_discovery(sniffer),
         ControllerDiscoveryFacade.build_tcp_server_discovery(sniffer, "brewpi",
-                                                             known_addresses=(TCPServerEndpoint('localhost',
-                                                                                                '127.0.0.1',
-                                                                                                8332),)),
+                                                             known_addresses=()),
     ]
 
     def __init__(self):
@@ -46,7 +49,9 @@ class ControlboxSyncher:
         self.facade.manager.events.add(self._handle_connection_event)  # connected?
 
     def _dump_device_info_events(self, connector, protocol: ControlboxProtocolV1):
-        LOGGER.debug(protocol)
+        """
+        XXX Document that
+        """
         if not hasattr(protocol, 'controller'):
             controller = protocol.controller = Controlbox(connector)
             events = controller.events = ControlboxEvents(controller, BrewpiConstructorCodec(), BrewpiStateCodec())
@@ -60,24 +65,26 @@ class ControlboxSyncher:
         events.read_system([1], 1)
 
     def _handle_connection(self, connection):
+        """
+        XXX Doc
+        """
         connector = connection.connector
-        help(connector)
         if connector.connected:
             self._dump_device_info_events(connector, connector.protocol)
-        LOGGER.debug("_handle_connection")
 
     def _handle_connection_event(self, event):
         """
         Callback when a controller (dis)appears
         """
-        LOGGER.debug("_handle_connection_event")
+        if type(event) == ConnectorConnectedEvent:
+            self.on_controller_appeared(event)
+        elif type(event) == ConnectorDisconnectedEvent:
+            self.on_controller_disappeared(event)
 
     def run(self):
         while True:
-            LOGGER.debug("update facade...")
             self.facade.update()
 
-            LOGGER.debug("loop over connections...")
             for connection in self.facade.manager.connections.values():
                 self._handle_connection(connection)
 
