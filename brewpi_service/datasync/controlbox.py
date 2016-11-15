@@ -18,22 +18,32 @@ from controlbox.connector.base import (
 from controlbox.protocol.controlbox import ControlboxProtocolV1
 from controlbox.connector.socketconn import TCPServerEndpoint
 
-from .database import DatabaseSyncher
+from .database import DatabaseControllerSyncher
 
 LOGGER = logging.getLogger(__name__)
 
 
 class BrewpiEvents(ConnectorEventVisitor):
+    handlers = {}
+
+    def __init__(self, aController):
+        self._controller = aController
+
     def __call__(self, event):
-        LOGGER.debug("event!")
-        LOGGER.info(event)
+        LOGGER.debug(event)
+        if event.type == 1:  # XXX Should be a constant here, not int
+            state_type = type(event.state)
+            if state_type in self.handlers:
+                self.handlers[state_type].update(self._controller,
+                                                 event.state,
+                                                 event)
 
 
 def sniffer(conduit):
     return determine_line_protocol(conduit, all_sniffers)
 
 
-class ControlboxSyncher(DatabaseSyncher):
+class ControlboxSyncher(DatabaseControllerSyncher):
     """
     A loop that syncs to the controller using Controlbox/Connector
     """
@@ -55,7 +65,7 @@ class ControlboxSyncher(DatabaseSyncher):
         if not hasattr(protocol, 'controller'):
             controller = protocol.controller = Controlbox(connector)
             events = controller.events = ControlboxEvents(controller, BrewpiConstructorCodec(), BrewpiStateCodec())
-            events.listeners.add(BrewpiEvents())
+            events.listeners.add(BrewpiEvents(controller))
         else:
             events = protocol.controller.events
 

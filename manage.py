@@ -50,7 +50,7 @@ def init_db():
 
 @manager.command
 def runserver():
-    synchers_loop = run_synchers.delay()
+    synchers_loop = run_synchers()
     app.run(debug=True)
     synchers_loop.revoke(terminate=True)
 

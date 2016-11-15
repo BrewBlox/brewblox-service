@@ -13,6 +13,7 @@ class ClockDevice(ControllerDevice):
     """
     __tablename__ = 'clock'
 
+    scale = Column(Integer)
     time = Column(Integer)
 
     def __repr__(self):
