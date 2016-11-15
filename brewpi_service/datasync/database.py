@@ -20,7 +20,8 @@ class DatabaseSyncher(AbstractSyncher):
                                             alive=True)
 
         LOGGER.debug("Controlled appeared: {0} -> new?{1}".format(controller, created))
-        db_session.commit()
+        # import IPython; IPython.embed()
+        # db_session.commit()
 
     def on_controller_disappeared(self, event):
         LOGGER.debug("Controlled disappeared: {0}", event.connector.conduit)

@@ -4,6 +4,8 @@ Flask-SQLAlchemy==2.1
 Flask-admin
 celery
 flask-plugins
+flask-restful
+flask-script
 
 -e git+https://github.com/m-mcgowan/controlbox-connect-py.git@feature/issue4#egg=controlbox-connect-py
 

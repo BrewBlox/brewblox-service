@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import logging
 import coloredlogs
 
@@ -6,7 +7,7 @@ from flask_script import Manager
 from brewpi_service import app
 from brewpi_service.tasks import run_synchers
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG')
 
 manager = Manager(app)
@@ -32,10 +33,26 @@ def list_routes():
 
 
 @manager.command
-def run():
-    # synchers_loop = run_synchers()
+def list_plugins():
+    from brewpi_service.plugins import plugin_manager
+
+    for name, plugin in plugin_manager.all_plugins.items():
+        print("{0} [{1}] - {2} (from: {3})".format(name,
+                                             '✓' if plugin.enabled else '✗',
+                                             plugin.description,
+                                             plugin.path))
+
+@manager.command
+def init_db():
+    from brewpi_service.database import init_db
+    init_db()
+
+
+@manager.command
+def runserver():
+    synchers_loop = run_synchers.delay()
     app.run(debug=True)
-    # synchers_loop.revoke(terminate=True)
+    synchers_loop.revoke(terminate=True)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,8 @@
+{
+    "identifier": "time_codecs",
+    "name": "Time Codecs",
+    "author": "glibersat",
+    "license": "GPL v3",
+    "description": "Scaled Time Codecs Plugin",
+    "version": "0.1"
+}
