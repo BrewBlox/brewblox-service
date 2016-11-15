@@ -11,9 +11,9 @@ LOGGER = logging.getLogger(__name__)
 
 class TimeDevicePlugin(BrewPiServicePlugin):
     def setup(self):
-        from .models import Clock
+        from .models import ClockDevice
 
     def install(self):
-        from .models import Clock
-        admin.add_view(ModelView(Clock, db_session))
+        from .models import ClockDevice
+        admin.add_view(ModelView(ClockDevice, db_session))
 

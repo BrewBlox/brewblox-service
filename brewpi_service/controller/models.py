@@ -1,6 +1,8 @@
 from sqlalchemy import (
-    Column, Integer, String, Boolean, ForeignKey
+    Column, Integer, String, Boolean, ForeignKey,
+    UniqueConstraint
 )
+from sqlalchemy.ext.declarative import declared_attr
 
 from ..database import Base
 
@@ -25,17 +27,29 @@ class Device(Base):
     """
     A device that can do or sense something
     """
+    __abstract__ = True
+
     id = Column(Integer, primary_key=True)
     type = Column(String(50))
 
     __mapper_args__ = {
         'polymorphic_identity': 'device',
-        'polymorphic_on':type
+        'polymorphic_on': type
     }
+
 
 class ControllerDevice(Device):
     """
     Any device tied to a controller, i.e. electronic or virtual
     """
-    controller_id = Column(Integer, ForeignKey('controller.id'))
+    __abstract__ = True
 
+    @declared_attr
+    def controller_id(self):
+        return Column(Integer, ForeignKey('controller.id'), nullable=False)
+    
+    device_id = Column(Integer, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('controller_id', 'device_id', name='_controller_device_uc'),
+    )
