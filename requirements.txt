@@ -7,7 +7,7 @@ flask-plugins
 flask-restful
 flask-script
 
--e git+https://github.com/m-mcgowan/controlbox-connect-py.git@feature/issue4#egg=controlbox-connect-py
+-e git+https://github.com/m-mcgowan/controlbox-connect-py.git@develop#egg=controlbox-connector-py
 
 # dev
 pytest
