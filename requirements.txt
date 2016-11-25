@@ -6,6 +6,7 @@ celery
 flask-plugins
 flask-restful
 flask-script
+coloredlogs
 
 -e git+https://github.com/m-mcgowan/controlbox-connect-py.git@develop#egg=controlbox-connector-py
 
