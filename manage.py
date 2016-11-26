@@ -3,14 +3,18 @@ import logging
 import coloredlogs
 
 from flask_script import Manager
+from flask_rq2.script import RQManager
 
 from brewpi_service import app
-from brewpi_service.tasks import run_synchers
+from brewpi_service.tasks import rq
+
 
 LOGGER = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG')
 
 manager = Manager(app)
+
+manager.add_command('rq', RQManager(rq))
 
 @manager.command
 def list_routes():
@@ -50,9 +54,7 @@ def init_db():
 
 @manager.command
 def runserver():
-    synchers_loop = run_synchers()
     app.run(debug=True)
-    synchers_loop.revoke(terminate=True)
 
 
 if __name__ == "__main__":

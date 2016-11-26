@@ -12,15 +12,13 @@ from .database import db_session, load_models
 from .plugins import plugin_manager
 from .rest import api
 
-
 app = Flask("brewpi_service")
 
 
 # FIXME Should be in settings
 app.config.update(
-    CELERY_BROKER_URL='redis://localhost:6379',
-    CELERY_RESULT_BACKEND='redis://localhost:6379'
 )
+
 
 # FIXME Should be in settings
 app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT'
@@ -41,6 +39,12 @@ plugin_manager.install_plugins()
 api.init_app(app)
 admin.init_app(app)
 
+from .tasks import rq, run_synchers
+
+rq.init_app(app)
+
+with app.app_context():
+    run_synchers.queue()
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):

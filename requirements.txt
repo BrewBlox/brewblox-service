@@ -2,11 +2,12 @@ SQLAlchemy==1.1.3
 Flask==0.11.1
 Flask-SQLAlchemy==2.1
 Flask-admin
-celery
 flask-plugins
 flask-restful
 flask-script
+flask-rq2
 coloredlogs
+
 
 -e git+https://github.com/m-mcgowan/controlbox-connect-py.git@develop#egg=controlbox-connector-py
 

@@ -40,17 +40,19 @@ class BaseClsMeta(DeclarativeMeta):
             if type(attribute) is ControllerData:
                 if attribute._writable:
                     requested_colname = "_{0}_requested".format(name)
-                    requested_column = Column(requested_colname, *attribute._args, **attribute._kwargs)
+                    requested_column = Column(requested_colname, *attribute._args, nullable=True, **attribute._kwargs)
                     new_fields[requested_colname] = requested_column
 
                     actual_colname = "_{0}".format(name)
-                    actual_column = Column(actual_colname, *attribute._args, **attribute._kwargs)
+                    actual_column = Column(actual_colname, *attribute._args, nullable=True, **attribute._kwargs)
                     new_fields[actual_colname] = actual_column
 
                     composite_colname = "{0}".format(name)
                     new_fields[composite_colname] = composite(ControllerCompositeColumn,
                                                               actual_column,
                                                               requested_column)
+                else:
+                    new_fields[name] = Column(name, *attribute._args, **attribute._kwargs)
 
         # Set new fields
         dict_.update(new_fields)
@@ -87,14 +89,14 @@ def get_or_create(session,
     Shortcut to get or create an object
     """
     try:
-        return session.query(model).filter_by(**kwargs).one(), True
+        return session.query(model).filter_by(**kwargs).one(), False
     except NoResultFound:
         kwargs.update(create_method_kwargs or {})
         created = getattr(model, create_method, model)(**kwargs)
         try:
             session.add(created)
             session.commit()
-            return created, False
+            return created, True
         except IntegrityError:
             session.rollback()
             return session.query(model).filter_by(**kwargs).one(), True
