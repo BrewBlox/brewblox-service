@@ -24,6 +24,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 class BrewpiEvents(ConnectorEventVisitor):
+    """
+    Handle events for one controller
+    """
     handlers = {}
 
     def __init__(self, aController):

@@ -47,7 +47,7 @@ class ControllerDevice(Device):
     @declared_attr
     def controller_id(self):
         return Column(Integer, ForeignKey('controller.id'), nullable=False)
-    
+
     device_id = Column(Integer, nullable=False)
 
     __table_args__ = (
