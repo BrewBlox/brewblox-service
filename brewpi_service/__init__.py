@@ -29,8 +29,8 @@ plugin_manager.init_app(app=app, plugin_folder="plugins_dir")
 admin.add_view(ModelView(Controller, db_session))
 
 # Add models to API
-api.add_resource(ControllerResource, '/controllers/<string:id>', endpoint='controllers_detail')
-api.add_resource(ControllerListResource, '/controllers', endpoint='controllers_list')
+api.add_resource(ControllerResource, '/controller/<string:id>', endpoint='controllers_detail')
+api.add_resource(ControllerListResource, '/controller', endpoint='controllers_list')
 
 # Now, let's plugin register things
 plugin_manager.install_plugins()

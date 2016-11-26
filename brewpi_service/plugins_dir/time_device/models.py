@@ -11,7 +11,12 @@ class ClockDevice(ControllerDevice):
     """
     A clock Sensor
     """
-    __tablename__ = 'clock'
+    __tablename__ = 'clock_device'
+
+    __mapper_args__ = {
+        'polymorphic_identity': "clock_device"
+    }
+    id = Column(Integer, ForeignKey('controller_device.id'), primary_key=True)
 
     scale = ControllerData(Integer, writable=True)
     time = ControllerData(Integer)

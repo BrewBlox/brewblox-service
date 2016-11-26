@@ -6,6 +6,7 @@ flask-plugins
 flask-restful
 flask-script
 flask-rq2
+flask-rq2[script]
 coloredlogs
 
 

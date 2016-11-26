@@ -2,6 +2,7 @@ import logging
 
 from brewpi.connector.codecs.time import ScaledTime
 
+from brewpi_service.rest import api
 from brewpi_service.plugins import BrewPiServicePlugin
 from brewpi_service.database import db_session, get_or_create
 from brewpi_service.admin import admin, ModelView
@@ -27,6 +28,9 @@ class TimeDevicePlugin(BrewPiServicePlugin):
         from .synchers import ScaledTimeSyncher
 
         BrewpiEvents.handlers[ScaledTime] = ScaledTimeSyncher()
+
+        from .resources import ClockDeviceResource
+        api.add_resource(ClockDeviceResource, '/clock/<int:id>', endpoint='clockdevice_detail')
 
 
 
