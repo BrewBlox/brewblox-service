@@ -1,22 +1,14 @@
 #!/usr/bin/env python
 import logging
-import coloredlogs
 
-from flask_script import Manager
-from flask_rq2.script import RQManager
+import click
 
 from brewpi_service import app
-from brewpi_service.tasks import rq
-
+from brewpi_service.plugins import plugin_manager
 
 LOGGER = logging.getLogger(__name__)
-coloredlogs.install(level='DEBUG')
 
-manager = Manager(app)
-
-manager.add_command('rq', RQManager(rq))
-
-@manager.command
+@app.cli.command()
 def list_routes():
     from urllib.parse import unquote
     from flask import url_for
@@ -33,29 +25,20 @@ def list_routes():
         output.append(line)
 
     for line in sorted(output):
-        print(line)
+        click.echo(line)
 
 
-@manager.command
+@app.cli.command()
 def list_plugins():
-    from brewpi_service.plugins import plugin_manager
-
     for name, plugin in plugin_manager.all_plugins.items():
         print("{0} [{1}] - {2} (from: {3})".format(name,
                                              '✓' if plugin.enabled else '✗',
                                              plugin.description,
                                              plugin.path))
 
-@manager.command
-def init_db():
+@app.cli.command()
+def initdb():
     from brewpi_service.database import init_db
+    click.echo("Initializing db...")
     init_db()
 
-
-@manager.command
-def runserver():
-    app.run(debug=True)
-
-
-if __name__ == "__main__":
-    manager.run()

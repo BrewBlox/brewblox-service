@@ -22,4 +22,4 @@ class ClockDevice(ControllerDevice):
     time = ControllerData(Integer)
 
     def __repr__(self):
-        return '<Clock {0} -> {1}>'.format(self.name, self.time)
+        return '<Clock {0} -> {1} (x{2})>'.format(self.id, self.time, self.scale)

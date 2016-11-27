@@ -1,8 +1,11 @@
-from flask_plugins import emit_event
 from sqlalchemy import create_engine, Column
 from sqlalchemy.orm import scoped_session, sessionmaker, mapper, composite
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.declarative import declarative_base, DeclarativeMeta
+
+from flask_plugins import emit_event
+
+from brewpi_service import app
 
 
 engine = create_engine('sqlite:///brewpi-service.db', convert_unicode=True)
@@ -10,6 +13,10 @@ db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=engine))
 
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db_session.remove()
 
 class ControllerData(object):
     def __init__(self, *args, **kwargs):

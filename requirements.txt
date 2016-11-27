@@ -1,12 +1,14 @@
-SQLAlchemy==1.1.3
-Flask==0.11.1
-Flask-SQLAlchemy==2.1
+SQLAlchemy>=1.1.3
+Flask>=0.11.1
+Flask-SQLAlchemy>=2.1
 Flask-admin
 flask-plugins
-flask-restful
-flask-script
+flask-cli
+flask-shell-ipython
 flask-rq2
-flask-rq2[script]
+flask-rq2[cli]
+flask-restful
+
 coloredlogs
 
 

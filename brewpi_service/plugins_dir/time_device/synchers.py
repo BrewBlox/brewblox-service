@@ -17,13 +17,15 @@ class ScaledTimeSyncher(AbstractDeviceSyncher):
 
         # get or create model
         device, created = get_or_create(db_session, ClockDevice,
-                                        create_method_kwargs={'time': state.time},
+                                        create_method_kwargs={'time': state.time,
+                                                              '_scale': state.scale},
                                         device_id=device_id,
                                         controller_id=1)
 
         if created is False:
             db_session.add(device)
             device.time = state.time
+            device._scale = state.scale
             db_session.commit()
         else:
             LOGGER.info("Created <ClockDevice>(ID={0})".format(device_id))

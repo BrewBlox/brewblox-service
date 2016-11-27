@@ -1,6 +1,6 @@
 # BrewPi Service
 
-Flask verison of a BrewPi Service for the next major release.
+Flask version of the BrewPi Service for the next major release.
 For our current production version, see [brewpi-www](https://github.com/BrewPi/brewpi-www)
 
 # Install
@@ -35,16 +35,24 @@ Install all required dependencies:
     
 # Setup
 
+Tell where the flask app is using:
+
+    export FLASK_APP=brewpi_service/__init__.py
+
 Create the database:
 
-    python create_db.py
+    flask initdb
     
 # Run
 
-You can run the development server with:
+First, run a worker with (don't forget to re-export FLASK_APP if you've just
+opened a new terminal):
 
-    celery -A brewpi_service.tasks.celery worker -l DEBUG
-    python run.py
+    flask rq worker
+
+Then, you can run the development server with:
+
+    flask run
 
 You can now point your browser to `http://localhost:5000/admin/` for the
 administration panel.

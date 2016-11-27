@@ -7,6 +7,8 @@ from flask_restful import marshal_with
 from .models import Controller
 from ..database import db_session
 
+from brewpi_service.rest import api
+
 controller_fields = {
     'id': fields.Integer,
     'name': fields.String,
@@ -14,7 +16,7 @@ controller_fields = {
 }
 
 parser = reqparse.RequestParser()
-parser.add_argument('controller', type=str)
+parser.add_argument('controller', type=int)
 
 
 class ControllerResource(Resource):
@@ -37,3 +39,8 @@ class ControllerListResource(Resource):
     def get(self):
         controllers = db_session.query(Controller).all()
         return controllers
+
+
+# Add models to API
+api.add_resource(ControllerResource, '/controller/<int:id>', endpoint='controllers_detail')
+api.add_resource(ControllerListResource, '/controller', endpoint='controllers_list')
