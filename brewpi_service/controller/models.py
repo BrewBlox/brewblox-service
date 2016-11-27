@@ -1,9 +1,12 @@
+import datetime
+
 from sqlalchemy import (
     Column, Integer, String, Boolean, ForeignKey,
-    UniqueConstraint
+    UniqueConstraint, DateTime
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.sql import func
 
 from ..database import Base
 
@@ -17,10 +20,8 @@ class Device(Base):
     id = Column(Integer, primary_key=True)
     type = Column(String(50))
 
-    __mapper_args__ = {
-        'polymorphic_identity': 'device',
-        'polymorphic_on': type
-    }
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
 
 
 class ControllerDevice(Device):
@@ -29,7 +30,8 @@ class ControllerDevice(Device):
     """
     __tablename__ = "controller_device"
     __mapper_args__ = {
-        'polymorphic_identity': "controller_device"
+        'polymorphic_identity': "controller_device",
+        'polymorphic_on': 'type'
     }
 
     @declared_attr
@@ -54,7 +56,7 @@ class Controller(Base):
     description = Column(String(128))
     alive = Column(Boolean)
 
-    devices = relationship("ControllerDevice")
+    devices = relationship("models.ControllerDevice", backref="controller")
 
     def __repr__(self):
         return '<Controller {0} - {1}>'.format(self.name, self.uri)

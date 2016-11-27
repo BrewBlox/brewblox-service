@@ -4,8 +4,6 @@ from brewpi.connector.codecs.time import ScaledTime
 
 from brewpi_service.rest import api
 from brewpi_service.plugins import BrewPiServicePlugin
-from brewpi_service.database import db_session, get_or_create
-from brewpi_service.admin import admin, ModelView
 
 __plugin__ = "ScaledTimeDevicePlugin"
 
@@ -22,8 +20,7 @@ class ScaledTimeDevicePlugin(BrewPiServicePlugin):
 
     def install(self):
         # Admin
-        from .models import ClockDevice
-        admin.add_view(ModelView(ClockDevice, db_session))
+        from . import admin
 
         # Data Syncher
         from brewpi_service.datasync.controlbox import BrewpiEvents

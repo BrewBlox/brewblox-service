@@ -13,7 +13,6 @@ db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=engine))
 
-
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     db_session.remove()
