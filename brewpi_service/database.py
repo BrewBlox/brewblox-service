@@ -3,12 +3,13 @@ from sqlalchemy.orm import scoped_session, sessionmaker, mapper, composite
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.declarative import declarative_base, DeclarativeMeta
 
+from flask_migrate import Migrate
 from flask_plugins import emit_event
 
 from brewpi_service import app
 
 
-engine = create_engine('sqlite:///brewpi-service.db', convert_unicode=True)
+engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'], convert_unicode=True)
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=engine))

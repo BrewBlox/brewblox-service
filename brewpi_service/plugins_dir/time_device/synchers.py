@@ -13,6 +13,7 @@ class ScaledTimeSyncher(AbstractDeviceSyncher):
     Handle synching with controller for device ClockDevice
     """
     def update(self, controller, state, event):
+        LOGGER.debug(controller.system_id().read())
         device_id = int.from_bytes(event.idchain, byteorder="little", signed=False)
 
         # get or create model

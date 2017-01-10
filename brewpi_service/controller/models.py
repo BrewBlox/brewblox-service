@@ -31,7 +31,8 @@ class ControllerDevice(Device):
     __tablename__ = "controller_device"
     __mapper_args__ = {
         'polymorphic_identity': "controller_device",
-        'polymorphic_on': 'type'
+        'polymorphic_on': 'type',
+        'with_polymorphic':'*'
     }
 
     @declared_attr

@@ -8,6 +8,7 @@ from brewpi.protocol.factory import all_sniffers
 from controlbox.connector_facade import ControllerDiscoveryFacade
 from controlbox.protocol.io import determine_line_protocol
 from controlbox.controller import Controlbox
+from brewpi.connector.controlbox.objects import BrewpiController, BuiltInObjectTypes
 from controlbox.events import (
     ControlboxEvents, ConnectorCodec, ConnectorEventVisitor
 )
@@ -66,8 +67,10 @@ class ControlboxSyncher(DatabaseControllerSyncher):
         XXX Document that
         """
         if not hasattr(protocol, 'controller'):
-            controller = protocol.controller = Controlbox(connector)
-            events = controller.events = ControlboxEvents(controller, BrewpiConstructorCodec(), BrewpiStateCodec())
+            protocol.controller = Controlbox(connector)
+            events = protocol.controller.events = ControlboxEvents(protocol.controller, BrewpiConstructorCodec(), BrewpiStateCodec())
+            controller = BrewpiController(connector, BuiltInObjectTypes())
+            controller.initialize(True)
             events.listeners.add(BrewpiEvents(controller))
         else:
             events = protocol.controller.events

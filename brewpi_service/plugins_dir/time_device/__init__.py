@@ -29,8 +29,12 @@ class ScaledTimeDevicePlugin(BrewPiServicePlugin):
         BrewpiEvents.handlers[ScaledTime] = ScaledTimeSyncher()
 
         # REST Api
-        from .resources import ClockDeviceResource
-        api.add_resource(ClockDeviceResource, '/clock/<int:id>', endpoint='clockdevice_detail')
+        from .resources import ClockDevice
+        from .schemas import ClockSchema
+        from brewpi_service.controller.schemas import ControllerDeviceDisambiguator
+        ControllerDeviceDisambiguator.class_to_schema[ClockDevice.__name__] = ClockSchema
+        print(ControllerDeviceDisambiguator.class_to_schema)
+        # api.add_resource(ClockDeviceResource, '/clock/<int:id>', endpoint='clockdevice_detail')
 
 
 
