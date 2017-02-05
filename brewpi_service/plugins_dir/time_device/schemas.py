@@ -6,7 +6,9 @@ from .models import ClockDevice
 class ClockSchema(ma.ModelSchema):
     class Meta:
         model = ClockDevice
-        fields = ('id', '_scale', 'time')
+        fields = ('id', '_scale', 'time', 'url')
+
+    url = ma.AbsoluteUrlFor('clock_detail', id='<id>')
 
 
 

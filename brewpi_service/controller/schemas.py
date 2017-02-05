@@ -22,7 +22,7 @@ def controller_device_schema_serialization_disambiguation(base_object, parent_ob
 class ControllerSchema(ma.ModelSchema):
     class Meta:
         model = Controller
-        fields = ('id', 'name', 'devices')
+        fields = ('id', 'name', 'devices', 'description', 'uri')
 
     devices = ma.List(PolyField(
         serialization_schema_selector=controller_device_schema_serialization_disambiguation,

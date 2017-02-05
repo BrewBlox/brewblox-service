@@ -1,7 +1,5 @@
 import coloredlogs
 
-
-
 from flask import Flask
 
 from flask_marshmallow import Marshmallow
@@ -24,9 +22,11 @@ from .controller import models
 from .controller.models import Controller
 from .controller import resources
 from .database import db_session, load_models
-from .plugins import plugin_manager
+from .plugins.core import plugin_manager
+from .plugins.rest import *
 from .rest import api
 from .tasks import rq, run_synchers
+
 
 
 plugin_manager.init_app(app=app, plugin_folder="plugins_dir")

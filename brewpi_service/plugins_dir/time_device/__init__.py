@@ -3,7 +3,7 @@ import logging
 from brewpi.connector.codecs.time import ScaledTime
 
 from brewpi_service.rest import api
-from brewpi_service.plugins import BrewPiServicePlugin
+from brewpi_service.plugins.core import BrewPiServicePlugin
 
 __plugin__ = "ScaledTimeDevicePlugin"
 
@@ -29,11 +29,11 @@ class ScaledTimeDevicePlugin(BrewPiServicePlugin):
         BrewpiEvents.handlers[ScaledTime] = ScaledTimeSyncher()
 
         # REST Api
-        from .resources import ClockDevice
+        from .rest import ClockDevice
         from .schemas import ClockSchema
         from brewpi_service.controller.schemas import ControllerDeviceDisambiguator
         ControllerDeviceDisambiguator.class_to_schema[ClockDevice.__name__] = ClockSchema
-        print(ControllerDeviceDisambiguator.class_to_schema)
+        # print(ControllerDeviceDisambiguator.class_to_schema)
         # api.add_resource(ClockDeviceResource, '/clock/<int:id>', endpoint='clockdevice_detail')
 
 

@@ -4,7 +4,7 @@ import logging
 import click
 
 from brewpi_service import app
-from brewpi_service.plugins import plugin_manager
+from brewpi_service.plugins.core import plugin_manager
 
 LOGGER = logging.getLogger(__name__)
 
