@@ -1,6 +1,6 @@
 import logging
 
-from brewpi.connector.codecs.time import ScaledTime
+# from brewpi.controlbox.codecs.time import ScaledTime
 
 from brewpi_service.rest import api
 from brewpi_service.plugins.core import BrewPiServicePlugin
@@ -23,10 +23,10 @@ class ScaledTimeDevicePlugin(BrewPiServicePlugin):
         from . import admin
 
         # Data Syncher
-        from brewpi_service.datasync.controlbox import BrewpiEvents
-        from .synchers import ScaledTimeSyncher
+        # from brewpi_service.datasync.controlbox import BrewpiEvents
+        # from .synchers import ScaledTimeSyncher
 
-        BrewpiEvents.handlers[ScaledTime] = ScaledTimeSyncher()
+        # BrewpiEvents.handlers[ScaledTime] = ScaledTimeSyncher()
 
         # REST Api
         from .rest import ClockDevice

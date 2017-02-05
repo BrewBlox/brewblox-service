@@ -1,0 +1,8 @@
+{
+    "identifier": "temperature_sensor",
+    "name": "Temperature Sensor Device Support",
+    "author": "glibersat",
+    "license": "GPL v3",
+    "description": "Codecs, Schemas and Models for the DS2xxx Temperature Sensors",
+    "version": "0.1"
+}

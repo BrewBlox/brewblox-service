@@ -1,28 +1,29 @@
 import logging
 import time
 
-from brewpi.connector.codecs.time import (
-    BrewpiStateCodec, BrewpiConstructorCodec
-)
-from brewpi.protocol.factory import all_sniffers
-from controlbox.connector_facade import ControllerDiscoveryFacade
+# from brewpi.controlbox.codecs.time import (
+#    BrewpiStateCodec, BrewpiConstructorCodec
+#)
+# from brewpi.protocol.factory import all_sniffers
+# from controlbox.connector_facade import ControllerDiscoveryFacade
 from controlbox.protocol.io import determine_line_protocol
 from controlbox.controller import Controlbox
-from brewpi.connector.controlbox.objects import BrewpiController, BuiltInObjectTypes
-from controlbox.events import (
-    ControlboxEvents, ConnectorCodec, ConnectorEventVisitor
-)
+# from brewpi.connector.controlbox.objects import BrewpiController, BuiltInObjectTypes
+# from controlbox.events import (
+#    ControlboxEvents, ConnectorCodec, ConnectorEventVisitor
+# )
 
-from controlbox.connector.base import (
-    ConnectorConnectedEvent, ConnectorDisconnectedEvent
-)
-from controlbox.protocol.controlbox import ControlboxProtocolV1
-from controlbox.connector.socketconn import TCPServerEndpoint
+# from controlbox.connector.base import (
+#    ConnectorConnectedEvent, ConnectorDisconnectedEvent
+# )
+# from controlbox.protocol.controlbox import ControlboxProtocolV1
+# from controlbox.connector.socketconn import TCPServerEndpoint
 
 from .database import DatabaseControllerSyncher
 
 LOGGER = logging.getLogger(__name__)
 
+ConnectorEventVisitor = object # FIXME
 
 class BrewpiEvents(ConnectorEventVisitor):
     """
@@ -51,18 +52,18 @@ class ControlboxSyncher(DatabaseControllerSyncher):
     """
     A loop that syncs to the controller using Controlbox/Connector
     """
-    discoveries = [
-        ControllerDiscoveryFacade.build_serial_discovery(sniffer),
-        ControllerDiscoveryFacade.build_tcp_server_discovery(sniffer, "brewpi",
-                                                             known_addresses=()),
-    ]
+    # discoveries = [
+    #    ControllerDiscoveryFacade.build_serial_discovery(sniffer),
+    #    ControllerDiscoveryFacade.build_tcp_server_discovery(sniffer, "brewpi",
+    #                                                         known_addresses=()),
+    # ]
 
     def __init__(self):
         self.facade = ControllerDiscoveryFacade(self.discoveries)
 
         self.facade.manager.events.add(self._handle_connection_event)  # connected?
 
-    def _dump_device_info_events(self, connector, protocol: ControlboxProtocolV1):
+    def _dump_device_info_events(self, connector, protocol):
         """
         XXX Document that
         """
