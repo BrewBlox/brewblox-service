@@ -10,7 +10,7 @@ class PluginSchema(ma.Schema):
     license = ma.String()
     version = ma.String()
     website = ma.String()
-    enabled = ma.Url()
+    enabled = ma.Boolean()
 
 
 plugin_schema = PluginSchema()
