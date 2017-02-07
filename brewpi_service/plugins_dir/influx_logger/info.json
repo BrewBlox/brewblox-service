@@ -1,0 +1,8 @@
+{
+    "identifier": "influx_logger",
+    "name": "InfluxDB Data logger",
+    "author": "glibersat",
+    "license": "GPL v3",
+    "description": "Log anything to time series",
+    "version": "0.1"
+}
