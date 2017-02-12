@@ -8,10 +8,12 @@ from flask_restful import marshal_with
 
 from brewpi_service import app
 
-from .models import TemperatureSensorDevice
+from .models import TemperatureSensorDevice, PID
 from .schemas import (
     temperature_sensor_schema,
-    temperature_sensors_schema
+    temperature_sensors_schema,
+    pid_loop_schema,
+    pid_loops_schema
 )
 
 
@@ -31,3 +33,21 @@ def temperature_sensor_detail(id):
     """
     temperature_sensor = TemperatureSensorDevice.query.get(id)
     return temperature_sensor_schema.jsonify(temperature_sensor)
+
+#-- PID
+@app.route('/pids/')
+def pid_loops():
+    """
+    List PIDs
+    """
+    all_pids = PID.query.all()
+    result = pid_loops_schema.dump(all_pids)
+    return jsonify(result.data)
+
+@app.route('/pids/<id>')
+def pid_loop_detail(id):
+    """
+    Detail a given PID
+    """
+    pid_loop = PID.query.get(id)
+    return pid_loop_schema.jsonify(pid_loop)

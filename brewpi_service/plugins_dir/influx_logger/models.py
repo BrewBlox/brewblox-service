@@ -6,7 +6,7 @@ from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship, backref
 
 from brewpi_service.database import Base
-from brewpi_service.controller.models import ControllerDevice
+from brewpi_service.controller.models import ControllerObject
 
 
 class LoggedDeviceConfiguration(Base):
@@ -17,8 +17,8 @@ class LoggedDeviceConfiguration(Base):
 
     id = Column(Integer, primary_key=True)
 
-    device_id = Column(Integer, ForeignKey('controller_device.id'), nullable=False)
-    device = relationship(ControllerDevice,
+    device_id = Column(Integer, ForeignKey('controller_object.id'), nullable=False)
+    device = relationship(ControllerObject,
                           backref=backref('logging_configurations',
                                           uselist=True,
                                           cascade='delete, all'))

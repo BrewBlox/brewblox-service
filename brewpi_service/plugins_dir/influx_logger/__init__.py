@@ -32,7 +32,7 @@ class InfluxMeasurementWriter:
 
         return json_body
 
-    
+
 class InfluxLoggerPlugin(BrewPiServicePlugin):
     """
     Log any model property to influxdb time series
@@ -65,6 +65,6 @@ class InfluxLoggerPlugin(BrewPiServicePlugin):
 
         from sqlalchemy import event
 
-        for configuration in db_session.query(LoggedDeviceConfiguration):
-            event.listen(configuration.device.__class__, 'before_update', self.log_data_before_update)
+        # for configuration in db_session.query(LoggedDeviceConfiguration):
+        #    event.listen(configuration.device.__class__, 'before_update', self.log_data_before_update)
 

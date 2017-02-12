@@ -16,14 +16,16 @@ class TemperatureSensorDevicePlugin(BrewPiServicePlugin):
 
     def setup(self):
         from .models import TemperatureSensorDevice
+        from .models import PID
 
     def install(self):
         # Admin
         from . import admin
 
         # REST Api
-        from .models import TemperatureSensorDevice
-        from .rest import TemperatureSensorDevice
-        from .schemas import TemperatureSensorDeviceSchema
-        from brewpi_service.controller.schemas import ControllerDeviceDisambiguator
+        from .rest import TemperatureSensorDevice, PID
+        from .schemas import TemperatureSensorDeviceSchema, PIDLoopSchema
+        from brewpi_service.controller.schemas import ControllerDeviceDisambiguator, ControllerLoopDisambiguator
         ControllerDeviceDisambiguator.class_to_schema[TemperatureSensorDevice.__name__] = TemperatureSensorDeviceSchema
+
+        ControllerLoopDisambiguator.class_to_schema[PID.__name__] = PIDLoopSchema

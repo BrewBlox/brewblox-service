@@ -11,26 +11,43 @@ from sqlalchemy.sql import func
 from ..database import Base
 
 
-class Device(Base):
+class TimestampMixin:
     """
-    A device that can do or sense something
+    Timestamp mixin for keeping track of creation time and update of objects
+    """
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+
+
+class BaseObject(Base, TimestampMixin):
+    """
+    Basic object either living inside or outside the electronic world
     """
     __abstract__ = True
 
     id = Column(Integer, primary_key=True)
     type = Column(String(50))
 
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
 
-
-class ControllerDevice(Device):
+class Device(BaseObject):
     """
-    Any device tied to a controller, i.e. electronic or virtual
+    An device not living on a controller, i.e. a manually triggered device.
     """
-    __tablename__ = "controller_device"
+    __tablename__ = "device"
     __mapper_args__ = {
-        'polymorphic_identity': "controller_device",
+        'polymorphic_identity': "device",
+        'polymorphic_on': 'type',
+        'with_polymorphic':'*'
+    }
+
+
+class ControllerObject(BaseObject):
+    """
+    Any object living in the controller
+    """
+    __tablename__ = "controller_object"
+    __mapper_args__ = {
+        'polymorphic_identity': "controller_object",
         'polymorphic_on': 'type',
         'with_polymorphic':'*'
     }
@@ -39,11 +56,38 @@ class ControllerDevice(Device):
     def controller_id(self):
         return Column(Integer, ForeignKey('controller.id'), nullable=False)
 
-    device_id = Column(Integer, nullable=False)
+    object_id = Column(Integer, nullable=False)
 
     __table_args__ = (
-        UniqueConstraint('controller_id', 'device_id', name='_controller_device_uc'),
+        UniqueConstraint('controller_id', 'object_id', name='_controller_object_uc'),
     )
+
+
+class ControllerDevice(ControllerObject):
+    """
+    Any device tied to a controller, i.e. electronic or virtual
+    """
+    __tablename__ = "controller_device"
+
+    __mapper_args__ = {
+        'polymorphic_identity': "controller_device"
+    }
+
+    id = Column(Integer, ForeignKey('controller_object.id'), primary_key=True)
+
+
+class ControllerLoop(ControllerObject):
+    """
+    A logical control block such as a PID
+    """
+    __tablename__ = "controller_loop"
+
+    __mapper_args__ = {
+        'polymorphic_identity': "controller_loop"
+    }
+
+    id = Column(Integer, ForeignKey('controller_object.id'), primary_key=True)
+
 
 class Controller(Base):
     """
@@ -58,6 +102,7 @@ class Controller(Base):
     alive = Column(Boolean)
 
     devices = relationship("models.ControllerDevice", backref="controller")
+    loops = relationship("models.ControllerLoop", backref="controller")
 
     def __repr__(self):
         return '<Controller {0} - {1}>'.format(self.name, self.uri)
