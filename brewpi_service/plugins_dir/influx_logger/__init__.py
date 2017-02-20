@@ -1,36 +1,17 @@
-from datetime import datetime
 import logging
+
+from influxdb import InfluxDBClient, SeriesHelper
 
 from brewpi_service.plugins.core import BrewPiServicePlugin
 from brewpi_service.database import db_session, get_or_create
 from brewpi_service.admin import admin, ModelView
 
-from influxdb import InfluxDBClient, SeriesHelper
+from .models import LoggedDeviceConfiguration
+from .utils import InfluxMeasurementWriter
 
 __plugin__ = "InfluxLoggerPlugin"
 
 LOGGER = logging.getLogger(__name__)
-
-class InfluxMeasurementWriter:
-    def __init__(self, influx_client, measurement):
-        self.client = influx_client
-        self.measurement = measurement
-
-    def write(self, fields):
-        json_body = self._to_json(fields)
-        self.client.write_points(json_body)
-        return True
-
-    def _to_json(self, fields):
-        json_body = [
-            {
-                "measurement": self.measurement,
-                "time": datetime.utcnow(),
-                "fields": fields
-            }
-        ]
-
-        return json_body
 
 
 class InfluxLoggerPlugin(BrewPiServicePlugin):
@@ -42,13 +23,20 @@ class InfluxLoggerPlugin(BrewPiServicePlugin):
 
         super(InfluxLoggerPlugin, self).__init__(*args, **kwargs)
 
-
     def log_data_before_update(self, mapper, connection, target):
-        # execute a stored procedure upon INSERT,
-        # apply the value to the row to be inserted
-        writer = InfluxMeasurementWriter(self.client, measurement='test')
-        writer.write({'value': 39})
+        """
+        Callback when an object is about to be saved: log its data if a
+        `LoggedDeviceConfiguration` matches.
+        """
+        logging_configuration = db_session.query(LoggedDeviceConfiguration).filter(LoggedDeviceConfiguration.device_id==target.id).one()
+        if not logging_configuration:
+            return
 
+        writer = InfluxMeasurementWriter(self.client, measurement='object_{0}'.format(logging_configuration.device_id))
+
+        # XXX Should support multiple fields
+        field = logging_configuration.device_field
+        writer.write({field: getattr(target, field)})
 
     def setup(self):
         from .models import LoggedDeviceConfiguration
@@ -65,6 +53,6 @@ class InfluxLoggerPlugin(BrewPiServicePlugin):
 
         from sqlalchemy import event
 
-        # for configuration in db_session.query(LoggedDeviceConfiguration):
-        #    event.listen(configuration.device.__class__, 'before_update', self.log_data_before_update)
+        for configuration in db_session.query(LoggedDeviceConfiguration):
+            event.listen(configuration.device.__class__, 'before_update', self.log_data_before_update)
 
