@@ -1,0 +1,11 @@
+# include production requirements
+-r requirements.txt
+
+# include documentation requirements
+-r docs/requirements-docs.txt
+
+# add development requirements
+pytest
+pytest-flask
+pytest-sugar
+pytest-flake8
