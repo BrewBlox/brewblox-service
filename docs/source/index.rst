@@ -15,6 +15,7 @@ Contents:
    development/hardware
    development/plugins
    development/roadmap
+   development/communication
 
 
 Indices and tables

@@ -19,8 +19,3 @@ marshmallow-sqlalchemy==0.12.0
 
 -e git+https://github.com/m-mcgowan/controlbox-connect-py.git@develop#egg=controlbox-connector-py
 
-# dev
-pytest
-pytest-flask
-pytest-sugar
-pytest-flake8

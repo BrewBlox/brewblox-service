@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(PRJ_PATH ),'brewpi_service'))
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.0'
+# needs_sphinx = '1.0'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -37,7 +37,8 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
-    'sphinx.ext.intersphinx'
+    'sphinx.ext.intersphinx',
+    'sphinxcontrib.seqdiag'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -56,8 +57,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'BrewPi Service'
-copyright = '2016-2017, Guillaume Libersat'
-author = 'Guillaume Libersat'
+copyright = '2017, Guillaume Libersat, Elco Jacobs (BrewPi BV)'
+author = 'Guillaume Libersat, Elco Jacobs (BrewPi BV)'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -123,7 +124,7 @@ html_theme = 'sphinx_rtd_theme'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#html_theme_options = {}
+# html_theme_options = {}
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []
@@ -217,17 +218,17 @@ htmlhelp_basename = 'BrewPiServicedoc'
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
-# The paper size ('letterpaper' or 'a4paper').
-#'papersize': 'letterpaper',
+    # The paper size ('letterpaper' or 'a4paper').
+    # 'papersize': 'letterpaper',
 
-# The font size ('10pt', '11pt' or '12pt').
-#'pointsize': '10pt',
+    # The font size ('10pt', '11pt' or '12pt').
+    # 'pointsize': '10pt',
 
-# Additional stuff for the LaTeX preamble.
-#'preamble': '',
+    # Additional stuff for the LaTeX preamble.
+    # 'preamble': '',
 
-# Latex figure (float) alignment
-#'figure_align': 'htbp',
+    # Latex figure (float) alignment
+    # 'figure_align': 'htbp',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
@@ -235,7 +236,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'BrewPiService.tex', 'BrewPi Service Documentation',
-     'Guillaume Libersat', 'manual'),
+     'Guillaume Libersat, Elco Jacobs (BrewPi BV)', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -297,7 +298,6 @@ texinfo_documents = [
 
 intersphinx_mapping = {
     'python': ('http://docs.python.org/3/', None),
-    'django': ('http://docs.djangoproject.com/en/1.9/', 'https://docs.djangoproject.com/en/1.9/_objects/'),
     'sphinx': ('http://sphinx.readthedocs.org/en/latest/', None),
 }
 
