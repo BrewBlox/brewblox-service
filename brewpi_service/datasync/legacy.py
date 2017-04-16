@@ -31,17 +31,15 @@ class LegacyControllerObserver(ControllerObserver):
                                 aBrewPiController.serial_port)
 
     def _on_controller_connected(self, aBrewPiController):
-        LOGGER.debug("Got new controller in service!")
         controller = Controller(name="Serial BrewPi on {0} at {1}".format(platform.node(),
                                                                           aBrewPiController.serial_port),
                                 uri=self._make_controller_uri(aBrewPiController),
                                 description="A BrewPi connected to a serial port, using the legacy protocol.",
-                                connected=aBrewPiController.connected)
+                                connected=aBrewPiController.is_connected)
 
         send("controller.connected", aController=controller)
 
     def _on_controller_disconnected(self, aBrewPiController):
-        LOGGER.debug("Lost controller in service!")
         send("controller.disconnected", aController=Controller(uri=self._make_controller_uri(aBrewPiController)))
 
 
