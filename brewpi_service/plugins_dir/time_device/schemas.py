@@ -12,6 +12,5 @@ class ClockSchema(ma.ModelSchema):
     url = ma.AbsoluteUrlFor('clock_detail', id='<id>')
 
 
-
 clock_schema = ClockSchema()
 clocks_schema = ClockSchema(many=True)

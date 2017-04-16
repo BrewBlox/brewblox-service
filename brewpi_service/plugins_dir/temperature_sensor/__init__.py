@@ -1,6 +1,5 @@
 import logging
 
-from brewpi_service.rest import api
 from brewpi_service.plugins.core import BrewPiServicePlugin
 
 __plugin__ = "TemperatureSensorDevicePlugin"
@@ -15,8 +14,8 @@ class TemperatureSensorDevicePlugin(BrewPiServicePlugin):
     """
 
     def setup(self):
-        from .models import TemperatureSensorDevice
-        from .models import PID
+        from .models import TemperatureSensorDevice # noqa
+        from .models import PID # noqa
 
     def install(self):
         # Admin

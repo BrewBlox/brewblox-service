@@ -3,6 +3,7 @@ from brewpi_service.admin import admin, ModelView
 
 from .models import ClockDevice
 
+
 class ClockDeviceAdminView(ModelView):
     column_hide_backrefs = False
     column_exclude_list = ('type',)

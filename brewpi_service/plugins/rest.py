@@ -18,6 +18,7 @@ def plugins():
     result = plugins_schema.dump(all_plugins)
     return jsonify(result.data)
 
+
 @app.route('/system/plugins/<id>')
 def plugin_detail(id):
     """

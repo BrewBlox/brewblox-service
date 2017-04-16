@@ -1,6 +1,7 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 
-class AbstractControllerSyncher:
+
+class AbstractControllerSyncher(ABC):
     @abstractmethod
     def on_controller_appeared(self, event):
         raise NotImplementedError
@@ -10,8 +11,7 @@ class AbstractControllerSyncher:
         raise NotImplementedError
 
 
-class AbstractDeviceSyncher:
+class AbstractDeviceSyncher(ABC):
     @abstractmethod
     def update(self, controller, state, event):
         raise NotImplementedError
-

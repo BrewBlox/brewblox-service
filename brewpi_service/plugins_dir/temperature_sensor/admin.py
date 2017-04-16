@@ -3,6 +3,7 @@ from brewpi_service.admin import admin, ModelView
 
 from .models import TemperatureSensorDevice, PID
 
+
 class TemperatureSensorDeviceAdminView(ModelView):
     column_hide_backrefs = False
     column_exclude_list = ('type',)
@@ -21,4 +22,3 @@ class PIDAdminView(ModelView):
 
 admin.add_view(PIDAdminView(PID,
                             db_session))
-

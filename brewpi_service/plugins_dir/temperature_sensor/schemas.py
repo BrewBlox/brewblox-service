@@ -1,7 +1,5 @@
 from brewpi_service import ma
 
-from marshmallow_polyfield import PolyField
-
 from .models import TemperatureSensorDevice, PID
 
 
@@ -33,4 +31,3 @@ class PIDLoopSchema(ma.ModelSchema):
 
 pid_loop_schema = PIDLoopSchema()
 pid_loops_schema = PIDLoopSchema(many=True)
-

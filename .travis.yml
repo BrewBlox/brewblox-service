@@ -1,0 +1,13 @@
+language: python
+python:
+  - "3.4"
+  - "3.5"
+install:
+- pip install tox==2.3.1
+- pip install tox-travis==0.4
+- pip install coveralls==1.1
+script: tox
+after_success: coveralls --exclude .tox
+notifications:
+  slack:
+    secure: Cy/hspCGdnqSD6fTPeXfM3zjusSJA8RC+yg/5qExV1rUTq6IGmcJ3ATEBmlGbKZPO0P+iCBh95KMkUKc5RxjUbCDWbab0JA6dL+W5zKJX28TRyIrCi+AtCONwtMioXoPlwDAPraVUvEsNeEAQGkPtBSHzHYPKkH/s4noz5mlTmMsLtUjmoqdPqNtFxWMk6yggwCMyqB6xlKyB2zVieYG768Fqx5KeklyxLlHVrTOhue4HLjXPjsOTi5Zo6I6ENJtFf3Hunw6K+QQeExOHbyEUsvQG62KXl5pQ/xrAbqnLF5maTSFrdiKP4AxokADg+J2GP0cCfHK4hLZ3SD4ouvry/4tbxVmbGbfekGq3Z3y3gBl/xmwFHlyiQ+2VF8RrOQ+8NzckB6PuQ3WDgp3o0zfPORRFWuSAWiP3XPyOb+xnuMI2DpDXlSYO/NCf37tMoA57uFVQiDwpo+4Z4+F/tHydNkL9Iiqg+57y7Fifcrmju7o0tL67BRR1s6L70JjTQuhj7znA3/c126quWJ8AHtdZAI6n4gGHIpghhHRr0t/9ZXBudS5XGRIGdp+E6daqF5ZtBHxWjxiAUt1VGKUTV39xPTs4Do1YNb/CPjWTfUEHeacwIXVG8nDOruiVu5gn8RtZ8QvIamXEO1AlCrgEspNqcQjo37GFesYJmWlrMAZwCY=

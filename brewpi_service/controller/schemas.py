@@ -4,9 +4,11 @@ from brewpi_service import ma
 
 from .models import Controller, ControllerDevice, ControllerLoop
 
+
 class ControllerDeviceDisambiguator:
     class_to_schema = {
     }
+
 
 def controller_device_schema_serialization_disambiguation(base_object, parent_obj):
     try:
@@ -20,8 +22,8 @@ def controller_device_schema_serialization_disambiguation(base_object, parent_ob
 
 
 class ControllerLoopDisambiguator:
-    class_to_schema = {
-    }
+    class_to_schema = {}
+
 
 def controller_loop_schema_serialization_disambiguation(base_object, parent_obj):
     try:
@@ -34,11 +36,10 @@ def controller_loop_schema_serialization_disambiguation(base_object, parent_obj)
                     "Are you sure this is a Controller Loop?".format(base_object.__class__))
 
 
-
 class ControllerSchema(ma.ModelSchema):
     class Meta:
         model = Controller
-        fields = ('id', 'name', 'devices', 'loops', 'description', 'uri')
+        fields = ('id', 'connected', 'name', 'devices', 'loops', 'description', 'uri')
 
     devices = ma.List(PolyField(
         serialization_schema_selector=controller_device_schema_serialization_disambiguation,
@@ -49,17 +50,16 @@ class ControllerSchema(ma.ModelSchema):
     ))
 
 
-
 class ControllerDeviceSchema(ma.ModelSchema):
     class Meta:
         model = ControllerDevice
         fields = ('id', 'object_id')
 
+
 class ControllerLoopSchema(ma.ModelSchema):
     class Meta:
         model = ControllerLoop
         fields = ('id', 'object_id')
-
 
 
 # Schema instanciations
@@ -71,4 +71,3 @@ controller_devices_schema = ControllerDeviceSchema(many=True)
 
 controller_loop_schema = ControllerLoopSchema()
 controller_loops_schema = ControllerLoopSchema(many=True)
-

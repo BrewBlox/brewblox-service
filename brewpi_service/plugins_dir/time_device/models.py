@@ -1,9 +1,8 @@
 from sqlalchemy import (
-    Column, Integer, String,
-    Boolean, ForeignKey
+    Column, Integer, ForeignKey
 )
 
-from brewpi_service.database import Base, ControllerData
+from brewpi_service.database import ControllerData
 from brewpi_service.controller.models import ControllerDevice
 
 

@@ -30,5 +30,3 @@ class ScaledTimeSyncher(AbstractDeviceSyncher):
             db_session.commit()
         else:
             LOGGER.info("Created <ClockDevice>(ID={0})".format(device_id))
-
-

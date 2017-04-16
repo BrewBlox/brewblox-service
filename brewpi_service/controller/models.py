@@ -4,9 +4,8 @@ from sqlalchemy import (
     Column, Integer, String, Boolean, ForeignKey,
     UniqueConstraint, DateTime
 )
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.sql import func
 
 from ..database import Base
 
@@ -37,7 +36,7 @@ class Device(BaseObject):
     __mapper_args__ = {
         'polymorphic_identity': "device",
         'polymorphic_on': 'type',
-        'with_polymorphic':'*'
+        'with_polymorphic': '*'
     }
 
 
@@ -49,7 +48,7 @@ class ControllerObject(BaseObject):
     __mapper_args__ = {
         'polymorphic_identity': "controller_object",
         'polymorphic_on': 'type',
-        'with_polymorphic':'*'
+        'with_polymorphic': '*'
     }
 
     @declared_attr
@@ -99,11 +98,10 @@ class Controller(Base):
     name = Column(String(64), index=True, unique=True)
     uri = Column(String(128), index=True, unique=True)
     description = Column(String(128))
-    alive = Column(Boolean)
+    connected = Column(Boolean)
 
     devices = relationship("models.ControllerDevice", backref="controller")
     loops = relationship("models.ControllerLoop", backref="controller")
 
     def __repr__(self):
         return '<Controller {0} - {1}>'.format(self.name, self.uri)
-

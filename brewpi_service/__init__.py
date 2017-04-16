@@ -1,3 +1,4 @@
+from basicevents import run as run_events
 import coloredlogs
 
 from flask import Flask
@@ -28,7 +29,6 @@ from .rest import api
 from .tasks import rq, run_synchers
 
 
-
 plugin_manager.init_app(app=app, plugin_folder="plugins_dir")
 
 # Now, let plugins register things
@@ -39,6 +39,9 @@ api.init_app(app)
 admin.init_app(app)
 
 rq.init_app(app)
+
+# Start the event process
+run_events()
 
 with app.app_context():
     run_synchers.queue()

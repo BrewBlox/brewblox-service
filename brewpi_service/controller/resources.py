@@ -1,15 +1,6 @@
 from flask import jsonify
 
-from flask_restful import reqparse
-from flask_restful import abort
-from flask_restful import Resource
-from flask_restful import fields
-from flask_restful import marshal_with
-
 from brewpi_service import app
-from brewpi_service.rest import api
-
-from ..database import db_session
 
 from .models import Controller, ControllerDevice
 from .schemas import (
@@ -27,15 +18,20 @@ def controllers():
     return jsonify(result.data)
 
 
+@app.route('/controllers/<id>')
+def controller_detail(id):
+    device = Controller.query.get(id)
+    return controller_schema.jsonify(device)
+
+
 @app.route('/controllers/devices/')
 def controller_devices():
     all_devices = ControllerDevice.query.all()
     result = controller_devices_schema.dump(all_devices)
     return jsonify(result.data)
 
+
 @app.route('/controllers/devices/<id>')
 def controller_device_detail(id):
     device = ControllerDevice.query.get(id)
     return controller_device_schema.jsonify(device)
-
-
