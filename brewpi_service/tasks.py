@@ -1,7 +1,7 @@
 # from celery import Celery
 from flask_rq2 import RQ
 
-from .datasync.controlbox import ControlboxSyncher
+# from .datasync.controlbox import ControlboxSyncher
 from .datasync.legacy import LegacySyncher
 from .datasync.database import DatabaseControllerSyncher
 
