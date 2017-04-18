@@ -8,6 +8,7 @@ flask-shell-ipython
 flask-rq2
 flask-rq2[cli]
 flask-restful
+-e git+https://github.com/jmcarp/flask-apispec.git@master#egg=flask-apispec
 
 coloredlogs
 

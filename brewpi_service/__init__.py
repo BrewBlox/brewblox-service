@@ -2,8 +2,8 @@ from basicevents import run as run_events
 import coloredlogs
 
 from flask import Flask
-
 from flask_marshmallow import Marshmallow
+from apispec import APISpec
 
 coloredlogs.install(level='DEBUG')
 
@@ -11,6 +11,13 @@ app = Flask("brewpi_service")
 
 # FIXME Should be in a configuration file
 app.config.update({
+    'APISPEC_SPEC': APISpec(
+        title='BrewPi Service',
+        version='0.1',
+        plugins=['apispec.ext.marshmallow']
+    ),
+    'APISPEC_SWAGGER_URL': '/specs/',
+    'APISPEC_SWAGGER_UI_URL': '/docs/',
     "SECRET_KEY": 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT',
     "SQLALCHEMY_DATABASE_URI": 'sqlite:///brewpi-service.db'
 })

@@ -1,37 +1,46 @@
-from flask import jsonify
+from flask_apispec import MethodResource
+from flask_apispec import marshal_with
 
 from brewpi_service import app
+from brewpi_service.rest import specs
 
 from .models import Controller, ControllerDevice
 from .schemas import (
-    controller_schema,
-    controllers_schema,
-    controller_device_schema,
-    controller_devices_schema
+    ControllerSchema,
+    ControllerDeviceSchema
 )
 
+@marshal_with(ControllerSchema(many=True))
+class ControllerList(MethodResource):
+    def get(self, **kwargs):
+        return Controller.query.all()
 
-@app.route('/controllers/')
-def controllers():
-    all_controllers = Controller.query.all()
-    result = controllers_schema.dump(all_controllers)
-    return jsonify(result.data)
-
-
-@app.route('/controllers/<id>')
-def controller_detail(id):
-    device = Controller.query.get(id)
-    return controller_schema.jsonify(device)
+app.add_url_rule('/controllers/', view_func=ControllerList.as_view(name="controllerlist"))
+specs.register(ControllerList)
 
 
-@app.route('/controllers/devices/')
-def controller_devices():
-    all_devices = ControllerDevice.query.all()
-    result = controller_devices_schema.dump(all_devices)
-    return jsonify(result.data)
+@marshal_with(ControllerSchema)
+class ControllerDetail(MethodResource):
+    def get(self, id):
+        return Controller.query.get(id)
+
+app.add_url_rule('/controllers/<id>/', view_func=ControllerDetail.as_view(name="controllerdetail"))
+specs.register(ControllerDetail)
 
 
-@app.route('/controllers/devices/<id>')
-def controller_device_detail(id):
-    device = ControllerDevice.query.get(id)
-    return controller_device_schema.jsonify(device)
+@marshal_with(ControllerDeviceSchema(many=True))
+class ControllerDeviceList(MethodResource):
+    def get(self):
+        return ControllerDevice.query.all()
+
+app.add_url_rule('/controllers/devices/', view_func=ControllerDeviceList.as_view(name="controllerdevicelist"))
+specs.register(ControllerDeviceList)
+
+
+@marshal_with(ControllerDevice)
+class ControllerDeviceDetail(MethodResource):
+    def get(self, id):
+        return ControllerDevice.query.get(id)
+
+app.add_url_rule('/controllers/devices/<id>/', view_func=ControllerDeviceDetail.as_view(name="controllerdevicedetail"))
+specs.register(ControllerDetail)
