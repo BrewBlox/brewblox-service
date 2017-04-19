@@ -17,7 +17,7 @@ app.config.update({
         plugins=['apispec.ext.marshmallow']
     ),
     'APISPEC_SWAGGER_URL': '/specs/',
-    'APISPEC_SWAGGER_UI_URL': '/docs/',
+    'APISPEC_SWAGGER_UI_URL': None,
     "SECRET_KEY": 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT',
     "SQLALCHEMY_DATABASE_URI": 'sqlite:///brewpi-service.db'
 })
