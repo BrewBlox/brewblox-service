@@ -7,6 +7,7 @@ from .datasync.database import DatabaseControllerSyncher
 
 rq = RQ()
 
+
 @rq.job(timeout=-1)
 def run_synchers():
     """
@@ -14,7 +15,6 @@ def run_synchers():
     """
 
     db_syncher = DatabaseControllerSyncher()
-
 
     syncher = LegacySyncher()
     syncher.run()
