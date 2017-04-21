@@ -1,9 +1,19 @@
 import functools
+
 import marshmallow
-from flask_apispec import FlaskApiSpec
+
+from flask_apispec import (
+    FlaskApiSpec,
+    marshal_with,
+    MethodResource
+)
 
 
 class Api:
+    """
+    Holds a version of the API with documentation and allows routes to
+    register.
+    """
     def __init__(self, prefix=""):
         self.prefix = prefix
         self._deferred_routes = []

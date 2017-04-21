@@ -60,14 +60,3 @@ class ControllerLoopSchema(ma.ModelSchema):
     class Meta:
         model = ControllerLoop
         fields = ('id', 'object_id')
-
-
-# Schema instanciations
-controller_schema = ControllerSchema()
-controllers_schema = ControllerSchema(many=True)
-
-controller_device_schema = ControllerDeviceSchema()
-controller_devices_schema = ControllerDeviceSchema(many=True)
-
-controller_loop_schema = ControllerLoopSchema()
-controller_loops_schema = ControllerLoopSchema(many=True)
