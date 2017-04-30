@@ -11,12 +11,43 @@ from brewpiv2.controller import (
 
 from brewpiv2.messages.decoder import RawMessageDecoder
 
-from ..controller.models import Controller
+from brewpi_service.controller.models import Controller
+
+from ..abstract import AbstractControllerSyncherBackend
+
 
 LOGGER = logging.getLogger(__name__)
 
 
-class LegacyControllerObserver(ControllerObserver):
+class BrewPiLegacySyncherBackend(AbstractControllerSyncherBackend):
+    """
+    A loop that syncs a BrewPi Controller using the legacy firmware
+    """
+    def __init__(self):
+        self.manager = BrewPiControllerManager()
+        self.msg_decoder = RawMessageDecoder()
+
+        self.controller_observer = BrewPiLegacyControllerObserver()
+
+    def run(self):
+        while True:
+            # Update manager
+            for new_controller in self.manager.update():
+                time.sleep(1)  # FIXME ugly
+                new_controller.subscribe(self.controller_observer)
+                new_controller.connect()
+
+            # Process messages from controllers
+            for port, controller in self.manager.controllers.items():
+                if controller.is_connected:
+                    for raw_message in controller.process_messages():
+                        for msg in self.msg_decoder.decode_controller_message(raw_message):
+                            LOGGER.debug(msg)
+
+            time.sleep(0.05)
+
+
+class BrewPiLegacyControllerObserver(ControllerObserver):
     """
     Controller event handler for the Legacy backend.
 
@@ -43,39 +74,3 @@ class LegacyControllerObserver(ControllerObserver):
         send("controller.disconnected", aController=Controller(uri=self._make_controller_uri(aBrewPiController)))
 
 
-class LegacySyncher:
-    """
-    A loop that syncs to the controller using the legacy firmware
-    """
-    def __init__(self):
-        self.manager = BrewPiControllerManager()
-        self.msg_decoder = RawMessageDecoder()
-
-        self.controller_observer = LegacyControllerObserver()
-
-    def _signal_controller_connected(self, new_controller):
-        """
-        When a new controller has been detected
-        """
-        controller = Controller()
-        send("controller.connected", controller=controller)
-
-    def _signal_controller_disconnected(self):
-        pass
-
-    def run(self):
-        while True:
-            # Update manager
-            for new_controller in self.manager.update():
-                time.sleep(1)  # FIXME ugly
-                new_controller.subscribe(self.controller_observer)
-                new_controller.connect()
-
-            # Process messages from controllers
-            for port, controller in self.manager.controllers.items():
-                if controller.is_connected:
-                    for raw_message in controller.process_messages():
-                        for msg in self.msg_decoder.decode_controller_message(raw_message):
-                            LOGGER.debug(msg)
-
-            time.sleep(0.05)

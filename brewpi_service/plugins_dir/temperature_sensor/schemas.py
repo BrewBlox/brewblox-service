@@ -16,7 +16,7 @@ class TemperatureSensorDeviceSchema(ControllerDeviceSchema):
         model = TemperatureSensorDevice
         fields = ('id', 'value', 'url')
 
-    url = ma.AbsoluteUrlFor('temperaturesensordevicedetail', id='<id>')
+    url = ma.AbsoluteUrlFor('temperaturesensordevice.details_view', id='<id>')
 
 
 class PIDLoopSchema(ControllerLoopSchema):
@@ -27,4 +27,4 @@ class PIDLoopSchema(ControllerLoopSchema):
         model = PID
         fields = ('id', 'input', 'actuator', 'setpoint', 'url')
 
-    url = ma.AbsoluteUrlFor('pidloopdetail', id='<id>')
+    url = ma.AbsoluteUrlFor('pid.details_view', id='<id>')

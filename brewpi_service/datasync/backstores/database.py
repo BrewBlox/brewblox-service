@@ -2,17 +2,18 @@ import logging
 
 from basicevents import subscribe
 
-from ..database import db_session, get_or_create
-from ..controller.models import Controller
+from brewpi_service.database import db_session, get_or_create
+from brewpi_service.controller.models import Controller
 
-from .abstract import AbstractControllerSyncher
+from ..abstract import AbstractBackstoreSyncher
+
 
 LOGGER = logging.getLogger(__name__)
 
 
-class DatabaseControllerSyncher(AbstractControllerSyncher):
+class DatabaseSyncher(AbstractBackstoreSyncher):
     """
-    Synchronize controller states to a database
+    Synchronize backend events to a Database using SQLAlchemy
     """
     @staticmethod
     @subscribe("controller.connected")
@@ -23,11 +24,11 @@ class DatabaseControllerSyncher(AbstractControllerSyncher):
                                                                   'connected': aController.connected},
                                             uri=aController.uri)
 
-        if created is False and controller.connected is False:
+        if created is False:
             controller.connected = True
             LOGGER.debug("Controller has reconnected: {0}".format(controller))
         else:
-            LOGGER.debug("New Controlled connected: {0}".format(controller))
+            LOGGER.debug("New Controller connected: {0}".format(controller))
 
         db_session.commit()
 
