@@ -10,7 +10,7 @@ import Pyro4 as pyro
 
 from .backends.brewpi_legacy import BrewPiLegacySyncherBackend
 from .backstores.database import DatabaseSyncher
-from .notifiers.sse import SSENotifier
+from .forwarders.sse import SSEForwarder
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class DataSyncherServer:
     """
     def __init__(self, unix_socket_name="brewpi-service-syncher"):
         self._backstores = (DatabaseSyncher())
-        self._notifiers = (SSENotifier())
+        self._forwarders = (SSEForwarder())
         self._backends = (BrewPiLegacySyncherBackend(),)
         self._threads = []
         self._unix_socket_name = unix_socket_name

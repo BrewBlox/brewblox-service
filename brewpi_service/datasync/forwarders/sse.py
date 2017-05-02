@@ -12,13 +12,13 @@ app.config["REDIS_URL"] = "redis://localhost"
 
 from flask_sse import sse
 
-from ..abstract import AbstractBackstoreSyncher
+from ..abstract import AbstractForwarder
 
 
 LOGGER = logging.getLogger(__name__)
 
 
-class SSENotifier(AbstractBackstoreSyncher):
+class SSEForwarder(AbstractForwarder):
     """
     Notify SSE clients
     """
