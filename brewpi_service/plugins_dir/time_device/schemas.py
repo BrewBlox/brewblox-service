@@ -13,4 +13,4 @@ class ClockSchema(ControllerDeviceSchema):
         fields = ('id', 'scale', 'time', 'url')
 
     scale = ma.Integer(attribute='_scale')
-    url = ma.AbsoluteUrlFor('clockdetail', id='<id>')
+    url = ma.AbsoluteUrlFor('clockdevice.details_view', id='<id>')

@@ -42,3 +42,8 @@ def initdb():
     click.echo("Initializing db...")
     init_db()
 
+
+@app.cli.command()
+def workers():
+    from brewpi_service import app, create_worker_app
+    create_worker_app(app)
