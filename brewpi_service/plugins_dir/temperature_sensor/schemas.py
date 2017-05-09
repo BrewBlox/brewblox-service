@@ -1,25 +1,47 @@
 from brewpi_service import ma
 
 from brewpi_service.controller.schemas import (
-    ControllerLoopSchema,
-    ControllerDeviceSchema
+    ControllerBlockSchema,
 )
 
-from .models import TemperatureSensorDevice, PID
+from .models import (
+    TemperatureSensor,
+    PID,
+    SensorSetpointPair
+)
+
+from .interfaces import (
+    IProcessValue,
+    ISensor,
+    IPID
+)
+
+from zope.interface import implementer
 
 
-class TemperatureSensorDeviceSchema(ControllerDeviceSchema):
+@implementer(IProcessValue)
+class SensorSetpointPair(ControllerBlockSchema):
     """
-    Serialization schema for the TemperatureSensorDevice
+    A simple pair of a Sensor and a Setpoint
     """
     class Meta:
-        model = TemperatureSensorDevice
+        model = SensorSetpointPair
+
+
+@implementer(ISensor)
+class TemperatureSensorSchema(ControllerBlockSchema):
+    """
+    Serialization schema for the TemperatureSensor
+    """
+    class Meta:
+        model = TemperatureSensor
         fields = ('id', 'value', 'url')
 
-    url = ma.AbsoluteUrlFor('temperaturesensordevice.details_view', id='<id>')
+    url = ma.AbsoluteUrlFor('temperaturesensor.details_view', id='<id>')
 
 
-class PIDLoopSchema(ControllerLoopSchema):
+@implementer(IPID)
+class PIDSchema(ControllerBlockSchema):
     """
     Serialization schema for the PID Loop algorithm
     """

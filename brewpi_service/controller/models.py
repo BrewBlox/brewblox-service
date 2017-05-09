@@ -40,13 +40,13 @@ class Device(BaseObject):
     }
 
 
-class ControllerObject(BaseObject):
+class ControllerBlock(BaseObject):
     """
-    Any object living in the controller
+    Any block (i.e. object) living in the controller
     """
-    __tablename__ = "controller_object"
+    __tablename__ = "controller_block"
     __mapper_args__ = {
-        'polymorphic_identity': "controller_object",
+        'polymorphic_identity': "controller_block",
         'polymorphic_on': 'type',
         'with_polymorphic': '*'
     }
@@ -56,36 +56,11 @@ class ControllerObject(BaseObject):
         return Column(Integer, ForeignKey('controller.id'), nullable=False)
 
     object_id = Column(Integer, nullable=False)
+    name = Column(String, nullable=True)
 
     __table_args__ = (
         UniqueConstraint('controller_id', 'object_id', name='_controller_object_uc'),
     )
-
-
-class ControllerDevice(ControllerObject):
-    """
-    Any device tied to a controller, i.e. electronic or virtual
-    """
-    __tablename__ = "controller_device"
-
-    __mapper_args__ = {
-        'polymorphic_identity': "controller_device"
-    }
-
-    id = Column(Integer, ForeignKey('controller_object.id'), primary_key=True)
-
-
-class ControllerLoop(ControllerObject):
-    """
-    A logical control block such as a PID
-    """
-    __tablename__ = "controller_loop"
-
-    __mapper_args__ = {
-        'polymorphic_identity': "controller_loop"
-    }
-
-    id = Column(Integer, ForeignKey('controller_object.id'), primary_key=True)
 
 
 class Controller(Base):
@@ -100,8 +75,7 @@ class Controller(Base):
     description = Column(String(128))
     connected = Column(Boolean)
 
-    devices = relationship("models.ControllerDevice", backref="controller")
-    loops = relationship("models.ControllerLoop", backref="controller")
+    blocks = relationship("models.ControllerBlock", backref="controller")
 
     def __repr__(self):
         return '<Controller {0} - {1}>'.format(self.name, self.uri)

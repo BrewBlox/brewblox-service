@@ -1,10 +1,10 @@
 from brewpi_service import ma
-from brewpi_service.controller.schemas import ControllerDeviceSchema
+from brewpi_service.controller.schemas import ControllerBlockSchema
 
 from .models import ClockDevice
 
 
-class ClockSchema(ControllerDeviceSchema):
+class ClockSchema(ControllerBlockSchema):
     """
     A clock that ticks
     """

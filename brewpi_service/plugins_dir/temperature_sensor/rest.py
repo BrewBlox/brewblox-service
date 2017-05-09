@@ -5,53 +5,53 @@ from brewpi_service.rest import (
     marshal_with, MethodResource
 )
 
-from .models import TemperatureSensorDevice, PID
+from .models import TemperatureSensor, PID
 from .schemas import (
-    TemperatureSensorDeviceSchema,
-    PIDLoopSchema,
+    TemperatureSensorSchema,
+    PIDSchema,
 )
 
-
-@marshal_with(TemperatureSensorDeviceSchema(many=True))
-class TemperatureSensorDeviceList(MethodResource):
+# -- Temperature Sensor
+@marshal_with(TemperatureSensorSchema(many=True))
+class TemperatureSensorList(MethodResource):
     """
     List Temperature Sensors
     """
     def get(self, **kwargs):
-        return TemperatureSensorDevice.query.all()
+        return TemperatureSensor.query.all()
 
-api_v1.register('/temperature_sensors/', TemperatureSensorDeviceList)
+api_v1.register('/temperature_sensors/', TemperatureSensorList)
 
 
-@marshal_with(TemperatureSensorDeviceSchema)
-class TemperatureSensorDeviceDetail(MethodResource):
+@marshal_with(TemperatureSensorSchema)
+class TemperatureSensorDetail(MethodResource):
     """
     Detail a given Temperature Sensor
     """
     def get(self, id, **kwargs):
-        return TemperatureSensorDevice.query.get(id)
+        return TemperatureSensor.query.get(id)
 
-api_v1.register('/temperature_sensors/<id>/', TemperatureSensorDeviceDetail)
+api_v1.register('/temperature_sensors/<id>/', TemperatureSensorDetail)
 
 
 # -- PID
-@marshal_with(PIDLoopSchema(many=True))
-class PIDLoopList(MethodResource):
+@marshal_with(PIDSchema(many=True))
+class PIDList(MethodResource):
     """
     List PIDs
     """
     def get(self, **kwargs):
         return PID.query.all()
 
-api_v1.register('/pids/', PIDLoopList)
+api_v1.register('/pids/', PIDList)
 
 
-@marshal_with(PIDLoopSchema)
-class PIDLoopDetail(MethodResource):
+@marshal_with(PIDSchema)
+class PIDDetail(MethodResource):
     """
     Detail a given PID
     """
     def get(self, id, **kwargs):
         return PID.query.get(id)
 
-api_v1.register('/pids/<id>/', PIDLoopDetail)
+api_v1.register('/pids/<id>/', PIDDetail)

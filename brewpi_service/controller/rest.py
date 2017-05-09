@@ -3,10 +3,10 @@ from flask_apispec import marshal_with
 
 from brewpi_service.rest import api_v1
 
-from .models import Controller, ControllerDevice
+from .models import Controller, ControllerBlock
 from .schemas import (
     ControllerSchema,
-    ControllerDeviceSchema
+    ControllerBlockSchema
 )
 
 
@@ -26,17 +26,9 @@ class ControllerDetail(MethodResource):
 api_v1.register('/controllers/<id>/', ControllerDetail)
 
 
-@marshal_with(ControllerDeviceSchema(many=True))
-class ControllerDeviceList(MethodResource):
+@marshal_with(ControllerBlockSchema(many=True))
+class ControllerBlockList(MethodResource):
     def get(self):
-        return ControllerDevice.query.all()
+        return ControllerBlock.query.all()
 
-api_v1.register('/controllers/devices/', ControllerDeviceList)
-
-
-@marshal_with(ControllerDevice)
-class ControllerDeviceDetail(MethodResource):
-    def get(self, id):
-        return ControllerDevice.query.get(id)
-
-api_v1.register('/controllers/devices/<id>/', ControllerDeviceDetail)
+api_v1.register('/controllers/blocks/', ControllerBlockList)

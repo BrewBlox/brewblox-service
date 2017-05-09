@@ -30,7 +30,7 @@ class ScaledTimeDevicePlugin(BrewPiServicePlugin):
         # REST Api
         from .rest import ClockDevice
         from .schemas import ClockSchema
-        from brewpi_service.controller.schemas import ControllerDeviceDisambiguator
-        ControllerDeviceDisambiguator.class_to_schema[ClockDevice.__name__] = ClockSchema
+        from brewpi_service.controller.schemas import ControllerBlockDisambiguator
+        ControllerBlockDisambiguator.class_to_schema[ClockDevice.__name__] = ClockSchema
         # print(ControllerDeviceDisambiguator.class_to_schema)
         # api.add_resource(ClockDeviceResource, '/clock/<int:id>', endpoint='clockdevice_detail')

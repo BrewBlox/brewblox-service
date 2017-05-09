@@ -3,10 +3,10 @@ from sqlalchemy import (
 )
 
 from brewpi_service.database import ControllerData
-from brewpi_service.controller.models import ControllerDevice
+from brewpi_service.controller.models import ControllerBlock
 
 
-class ClockDevice(ControllerDevice):
+class ClockDevice(ControllerBlock):
     """
     A clock Sensor
     """
@@ -15,7 +15,7 @@ class ClockDevice(ControllerDevice):
     __mapper_args__ = {
         'polymorphic_identity': "clock_device"
     }
-    id = Column(Integer, ForeignKey('controller_device.id'), primary_key=True)
+    id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
 
     scale = ControllerData(Integer, writable=True)
     time = ControllerData(Integer)

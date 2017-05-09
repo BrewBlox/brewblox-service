@@ -36,7 +36,7 @@ ma = Marshmallow(app)
 from . import commands
 
 from . import controller
-from .controller.models import ControllerDevice
+from .controller.models import ControllerBlock
 from .database import db_session, load_models
 
 from .plugins.rest import *
