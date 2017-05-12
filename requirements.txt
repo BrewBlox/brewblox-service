@@ -9,6 +9,8 @@ flask-rq2
 flask-rq2[cli]
 flask-restful
 
+influxdb
+pyserial
 coloredlogs
 
 flask-marshmallow==0.7.0
