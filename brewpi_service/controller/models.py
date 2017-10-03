@@ -7,7 +7,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declared_attr
 
-from ..database import Base
+from ..database import Base, db_session
 
 
 class TimestampMixin:
@@ -51,15 +51,16 @@ class ControllerBlock(BaseObject):
         'with_polymorphic': '*'
     }
 
-    @declared_attr
-    def controller_id(self):
-        return Column(Integer, ForeignKey('controller.id'), nullable=False)
+    is_static = Column(Boolean, default=False, nullable=False)
+
+    profile_id = Column(Integer, ForeignKey('controller_profile.id'), nullable=True)
+    profile = relationship("models.ControllerProfile")
 
     object_id = Column(Integer, nullable=False)
     name = Column(String, nullable=True)
 
     __table_args__ = (
-        UniqueConstraint('controller_id', 'object_id', name='_controller_object_uc'),
+        UniqueConstraint('profile_id', 'object_id', name='_controller_object_uc'),
     )
 
 
@@ -75,7 +76,28 @@ class Controller(Base):
     description = Column(String(128))
     connected = Column(Boolean)
 
-    blocks = relationship("models.ControllerBlock", backref="controller")
+    profile_id = Column(Integer, ForeignKey('controller_profile.id'))
+    profile = relationship("ControllerProfile", back_populates="controllers")
 
     def __repr__(self):
-        return '<Controller {0} - {1}>'.format(self.name, self.uri)
+        return '<Controller {0}@{1} using profile "{2}">'.format(self.name, self.uri, self.profile)
+
+
+class ControllerProfile(Base):
+    """
+    A Profile for a Controller
+    """
+    __tablename__ = 'controller_profile'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(64), index=True, unique=True)
+    is_static = Column(Boolean)
+
+    controllers = relationship("Controller", back_populates="profile")
+
+    def get_block_by_name(self, name):
+        return ControllerBlock.query.with_polymorphic('*').filter(ControllerBlock.name==name).one()
+
+    def __repr__(self):
+        return "{0}[{1}]".format(self.name, 'S' if self.is_static else 'D')
+

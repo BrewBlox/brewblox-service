@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import create_engine, Column
 from sqlalchemy.orm import scoped_session, sessionmaker, mapper, composite
 from sqlalchemy.orm.exc import NoResultFound
@@ -7,7 +9,9 @@ from sqlalchemy.exc import IntegrityError
 from flask_plugins import emit_event
 
 from brewpi_service import app
+from brewpi_service.controller.state import VolatileStateMeta
 
+LOGGER = logging.getLogger(__name__)
 
 engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'], convert_unicode=True)
 db_session = scoped_session(sessionmaker(autocommit=False,
@@ -31,6 +35,8 @@ class ControllerData(object):
         self._args = args
         self._kwargs = kwargs
 
+        self.actual_value = 2
+
 
 class ControllerCompositeColumn(object):
     def __init__(self, actual_column, requested_column):
@@ -41,7 +47,7 @@ class ControllerCompositeColumn(object):
         return self.actual_column, self.requested_column
 
 
-class BaseClsMeta(DeclarativeMeta):
+class BaseClsMeta(DeclarativeMeta, VolatileStateMeta):
     def __init__(cls, classname, bases, dict_):
 
         new_fields = {}
@@ -68,7 +74,23 @@ class BaseClsMeta(DeclarativeMeta):
         for new_field_name, new_field in new_fields.items():
             setattr(cls, new_field_name, dict_[new_field_name])
 
-        super(BaseClsMeta, cls).__init__(classname, bases, dict_)
+        DeclarativeMeta.__init__(cls, classname, bases, dict_)
+
+    def __setattr__(cls, name, value):
+        if name in cls.controller_data_fields:
+            attribute = getattr(cls, name)
+            attribute.requested_value = value
+
+            return value
+        else:
+            return super().__setattr__(name, value)
+
+    def __getattribute__(cls, name):
+        if name in cls.controller_data_fields:
+            return getattr(cls, name).actual_value
+        else:
+            return super().__getattr__(name)
+
 
 
 Base = declarative_base(metaclass=BaseClsMeta, mapper=mapper)
@@ -104,8 +126,8 @@ def get_or_create(session,
         created = getattr(model, create_method, model)(**kwargs)
         try:
             session.add(created)
-            session.commit()
             return created, True
-        except IntegrityError:
+        except IntegrityError as e:
             session.rollback()
+            LOGGER.error(e)
             return session.query(model).filter_by(**kwargs).one(), True

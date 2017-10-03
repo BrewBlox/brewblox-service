@@ -1,4 +1,3 @@
-from basicevents import run as run_events
 import coloredlogs
 
 from flask import Flask
@@ -65,9 +64,6 @@ def create_front_app():
     # Init application components
     from .admin import admin
     admin.init_app(app)
-
-    # Start the event process
-    # run_events()
 
     return app
 

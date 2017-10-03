@@ -1,17 +1,15 @@
-from abc import abstractmethod, ABC
+from abc import abstractmethod
 
+from circuits import Component
 
-class AbstractControllerSyncherBackend(ABC):
+class AbstractControllerSyncherBackend:
     """
     A Syncher Backend implements a way to sync a Hardware Device (Controller)
     with the service.
     """
-    @abstractmethod
-    def run(self):
-        raise NotImplementedError
+    pass
 
-
-class AbstractForwarder(ABC):
+class AbstractForwarder:
     """
     Forwards synched data to some other systems so they can sync at their turn.
     """
@@ -24,7 +22,7 @@ class AbstractForwarder(ABC):
         raise NotImplementedError
 
 
-class AbstractBackstoreSyncher(ABC):
+class AbstractBackstoreSyncher:
     """
     Implements a syncher that takes care of receiving events from `Backends`
     and persist data into a backing store.
@@ -38,7 +36,7 @@ class AbstractBackstoreSyncher(ABC):
         raise NotImplementedError
 
 
-class AbstractDeviceSyncher(ABC):
+class AbstractDeviceSyncher:
     @abstractmethod
     def update(self, controller, state, event):
         raise NotImplementedError

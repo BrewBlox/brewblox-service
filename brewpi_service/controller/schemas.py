@@ -24,7 +24,7 @@ def controller_block_schema_serialization_disambiguation(base_object, parent_obj
 class ControllerSchema(ma.ModelSchema):
     class Meta:
         model = Controller
-        fields = ('id', 'connected', 'name', 'devices', 'loops', 'description', 'uri')
+        fields = ('id', 'connected', 'name', 'blocks', 'description', 'uri')
 
     blocks = ma.List(PolyField(
         serialization_schema_selector=controller_block_schema_serialization_disambiguation,

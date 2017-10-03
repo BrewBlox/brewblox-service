@@ -20,7 +20,7 @@ from zope.interface import implementer
 
 
 @implementer(IProcessValue)
-class SensorSetpointPair(ControllerBlockSchema):
+class SensorSetpointPairSchema(ControllerBlockSchema):
     """
     A simple pair of a Sensor and a Setpoint
     """

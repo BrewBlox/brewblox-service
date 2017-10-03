@@ -1,6 +1,6 @@
 import logging
 
-from basicevents import subscribe
+from circuits import Component, handler
 
 from brewpi_service.database import db_session, get_or_create
 from brewpi_service.controller.models import Controller
@@ -18,22 +18,20 @@ from ..abstract import AbstractForwarder
 LOGGER = logging.getLogger(__name__)
 
 
-class SSEForwarder(AbstractForwarder):
+class SSEForwarder(Component, AbstractForwarder):
     """
     Notify SSE clients
     """
-    @staticmethod
-    @subscribe("controller.connected")
-    def on_controller_appeared(aController):
-        print("SSE...")
+    @handler("ControllerConnected")
+    def on_controller_appeared(self, event):
+        LOGGER.debug("SSE: Controller Connected...")
         with app.app_context():
             sse.publish({"message": "connect"}, type='greeting')
 
 
-    @staticmethod
-    @subscribe("controller.disconnected")
-    def on_controller_disappeared(aController):
-        print("SSE out...")
+    @handler("ControllerDisconnected")
+    def on_controller_disappeared(self, event):
+        LOGGER.debug("SSE: Controller disconnected...")
         with app.app_context():
             sse.publish({"message": "disconnect"}, type='greeting')
 

@@ -7,7 +7,7 @@ from .models import TemperatureSensor, PID
 class TemperatureSensorAdminView(ModelView):
     column_hide_backrefs = False
     column_exclude_list = ('type',)
-    column_filters = ('controller',)
+    # column_filters = ('controller',)
 
 
 admin.add_view(TemperatureSensorAdminView(TemperatureSensor,
@@ -17,7 +17,7 @@ admin.add_view(TemperatureSensorAdminView(TemperatureSensor,
 class PIDAdminView(ModelView):
     column_hide_backrefs = True
     column_exclude_list = ('type',)
-    column_filters = ('controller',)
+    # column_filters = ('controller',)
 
 
 admin.add_view(PIDAdminView(PID,

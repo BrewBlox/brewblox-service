@@ -16,6 +16,7 @@ class TemperatureSensorPlugin(BrewPiServicePlugin):
     def setup(self):
         from .models import TemperatureSensor # noqa
         from .models import PID # noqa
+        from .models import SensorSetpointPair # noqa
 
     def install(self):
         # Admin
@@ -28,3 +29,4 @@ class TemperatureSensorPlugin(BrewPiServicePlugin):
 
         ControllerBlockDisambiguator.class_to_schema[TemperatureSensor.__name__] = TemperatureSensorSchema
         ControllerBlockDisambiguator.class_to_schema[PID.__name__] = PIDSchema
+
