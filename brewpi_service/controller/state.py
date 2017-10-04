@@ -86,7 +86,6 @@ class ControllerStateTransaction:
         self.dirty_blocks = []
 
     def get_compiled_changes(self):
-        # Do something
         # Collect changed fields
         changes = []
 

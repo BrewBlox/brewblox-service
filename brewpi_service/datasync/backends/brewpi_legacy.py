@@ -20,6 +20,12 @@ from brewpi_service.controller.events import (
     ControllerConnected,
     ControllerDisconnected
 )
+from brewpi_service.controller.profile import (
+    ControllerProfileManager,
+    NoResultFound
+)
+from brewpi_service.controller.state import ControllerStateManager
+
 
 from ..abstract import AbstractControllerSyncherBackend
 
@@ -41,6 +47,53 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
         self.controller_observer = BrewPiLegacyControllerObserver().register(self)
 
         self.shutdown = False
+
+    @staticmethod
+    def make_profile(name="brewpiv2"):
+        """
+        Create the brewpiv2 profile
+        """
+        LOGGER.info("Making BrewPi v2 Profile into database under name '{0}'...".format(name))
+        profile = ControllerProfileManager.create(name, static=True)
+
+        beer2_sensor = TemperatureSensor(profile=profile,
+                                         object_id=49,
+                                         name="beer2")
+
+        db_session.add(beer2_sensor)
+
+        beer2_setpoint = SetpointSimple(profile=profile,
+                                        object_id=51,
+                                        name="beer2set")
+        db_session.add(beer2_setpoint)
+
+        beer2_setpoint_pair = SensorSetpointPair(profile=profile,
+                                                 setpoint=beer2_setpoint,
+                                                 sensor=beer2_sensor,
+                                                 object_id=50) # not required since static
+
+        db_session.add(beer2_setpoint_pair)
+
+        heater2_pwm = ActuatorPwm(profile=profile,
+                                  object_id=53,
+                                  period=4,
+                                  name="heater2pwm")
+
+        db_session.add(heater2_pwm)
+
+        heater2_pid = PID(profile=profile,
+                          name="heater2pid",
+                          object_id=52,
+                          input=beer1_setpoint_pair,
+                          output=heater2_pwm)
+
+        db_session.add(heater2_pid)
+
+        db_session.commit()
+
+        return profile
+
+
 
     @handler("stopped")
     def stopped(self, *args):

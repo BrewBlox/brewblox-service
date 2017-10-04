@@ -7,7 +7,7 @@ class ISensor(Interface):
     sensor_value  = Attribute("""Actual value of this sensor""")
 
 
-class IProcessValue(Interface):
+class ISensorSetpointPair(Interface):
     """
     A compound object of a setpoint and a sensor value
     """

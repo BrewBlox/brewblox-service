@@ -21,6 +21,8 @@ from brewpi_service.controller.state import ControllerStateManager
 from brewpiv2.messages.temperature import TemperaturesMessage
 from brewpiv2.messages.control import ControlSettingsMessage
 
+from .brewpi_legacy import BrewPiLegacySyncherBackend
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -39,28 +41,11 @@ class VirtualBrewPiSyncherBackend(Component, AbstractControllerSyncherBackend):
 
         self.shutdown = False
 
-    def make_profile(self, name):
+    def make_profile(self, name="virtual_brewpi"):
         """
         Create the virtual profile
         """
-        profile = ControllerProfileManager.create(name, static=True)
-
-        heater1_setpoint = SensorSetpointPair(profile=profile,
-                                              object_id=50, # not required since static
-                                              name="heater1setpoint")
-
-        db_session.add(heater1_setpoint)
-
-        heater1_pid = PID(profile=profile,
-                          name="heater1pid",
-                          object_id=51,
-                          input=heater1_setpoint)
-
-        db_session.add(heater1_pid)
-
-        db_session.commit()
-
-        return profile
+        return BrewPiLegacySyncherBackend.make_profile(name)
 
 
     def started(self, *args):
@@ -68,7 +53,7 @@ class VirtualBrewPiSyncherBackend(Component, AbstractControllerSyncherBackend):
         try:
             self.profile = ControllerProfileManager.get(profile_name)
         except NoResultFound:
-            self.profile = self.make_profile(profile_name)
+            self.profile = self.make_profile(name=profile_name)
 
         self.controller = Controller(name="Virtual BrewPi",
                                      uri="virtual://localhost",

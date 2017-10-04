@@ -11,7 +11,7 @@ from brewpi_service.controller.state import ControllerDataField
 from zope.interface import implementer
 
 from .interfaces import (
-    IProcessValue, ISensor
+    ISensorSetpointPair, ISensor
 )
 
 class ProcessValueMixin(BaseObject):
@@ -22,8 +22,29 @@ class ProcessValueMixin(BaseObject):
     }
 
 
-@implementer(IProcessValue)
-class SensorSetpointPair(ControllerBlock, ProcessValueMixin):
+class SetpointSimple(ControllerBlock):
+    """
+    A Simple Setpoint
+    """
+    __tablename__ = 'controller_block_setpoint_simple'
+
+    __mapper_args__ = {
+        'polymorphic_identity': "controller_block_setpoint_simple"
+    }
+
+    simple_setpoint_id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
+
+    name = Column(String, nullable=True)
+
+    value = ControllerDataField(Float)
+
+    def __repr__(self):
+        return "<SetpointSimple '{0}':{1}".format(self.name,
+                                                  self.value)
+
+
+@implementer(ISensorSetpointPair)
+class SensorSetpointPair(ControllerBlock):
     """
     A Simple pair of a sensor and a setpoint
     """
@@ -33,12 +54,17 @@ class SensorSetpointPair(ControllerBlock, ProcessValueMixin):
         'polymorphic_identity': "controller_block_sensor_setpoint_pair"
     }
 
+    # sensor_setpoint_pair_id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
 
-    sensor_setpoint_pair_id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
+    setpoint_id = Column(Integer, ForeignKey('controller_block.id'))
+    setpoint = relationship("ControllerBlock", primaryjoin="and_(SensorSetpointPair.setpoint_id==ControllerBlock.id)", backref="setpoint_setpoint_pair")
 
-    name = Column(String, nullable=True)
-    # value = ControllerData(Float)
-    value = ControllerDataField(Float)
+    sensor_id = Column(Integer, ForeignKey('controller_block.id'))
+    sensor = relationship("ControllerBlock", primaryjoin="and_(SensorSetpointPair.sensor_id==ControllerBlock.id)", backref="sensor_setpoint_pair")
+
+    def __repr__(self):
+        return '<SetPointPair set:{0}/{1}>'.format(self.setpoint, self.sensor)
+
 
 
 @implementer(ISensor)
