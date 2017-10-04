@@ -1,15 +1,19 @@
-from collections import defaultdict
+from collections import defaultdict, UserList
+
+from circuits import Component
+
+from .events import ControllerStateChangeRequest
 
 import logging
 
 LOGGER = logging.getLogger(__name__)
 
-class ControllerData(object):
+
+class ControllerDataField(UserList):
+    (ACTUAL, REQUESTED, DIRTY) = range(3)
+
     def __init__(self, *args, **kwargs):
         self._writable = False
-
-        self._actual_value = None
-        self._requested_value = None
 
         if 'writable' in kwargs:
             self._writable = True
@@ -18,41 +22,93 @@ class ControllerData(object):
         self._args = args
         self._kwargs = kwargs
 
+        super(ControllerDataField, self).__init__([None, None, False])
 
-class VolatileStateMeta(type):
-    def __new__(cls, classname, bases, dict_):
-        cls.controller_data_fields = []
+    def request_value(self, value):
+        self.data[ControllerDataField.REQUESTED] = value
+        self.data[ControllerDataField.DIRTY] = True
 
-        for name, attribute in dict_.items():
-            if type(attribute) is ControllerData:
-                cls.controller_data_fields.append(name)
-
-        return super().__new__(cls, classname, bases, dict_)
+    def get_requested_value(self):
+        return self.data[ControllerDataField.REQUESTED]
 
 
-
-class BlockState(dict):
-    pass
-
-class ControllerState:
+class BlockState(defaultdict):
     def __init__(self):
+        super(BlockState, self).__init__(lambda: [None, None])
+
+class ControllerState(Component):
+    def __init__(self, aControllerStateManager):
         # {BLOCK_ID: {ATTR_NAME: (ACTUAL_VALUE, REQUESTED_VALUE)}}
         self.states = defaultdict(BlockState)
 
+        self._controller_state_manager = aControllerStateManager
+
     def set(self, aBlock, attribute_name, value):
-        self.states[aBlock.object_id][attribute_name] = (value, None)
+        self.states[aBlock.object_id][attribute_name] = [value, None]
 
-    def request(self, aBlock, attribute_name, value):
-        if self.states[aBlock.object_id].has_key(attribute_name):
-            self.states[aBlock.object_id][attribute_name][1] = value
-        else:
-            self.states[aBlock.object_id][attribute_name] = (None, value)
+    def set_requested(self, aBlock, attribute_name, value):
+        attr_data = self.get(aBlock, attribute_name)
+        attr_data[1] = value
 
-class ControllerStateManager:
+    def get(self, aBlock, attribute_name):
+        return self.states[aBlock.object_id][attribute_name]
+
+    def get_requested(self, aBlock, attribute_name):
+        return self.get(aBlock, attribute_name)[1]
+
+    def get_actual(self, aBlock, attribute_name):
+        return self.get(aBlock, attribute_name)[0]
+
+
+    def begin_transaction(self):
+        return ControllerStateTransaction()
+
+    def commit(self, aController, aControllerStateTransaction):
+        changes = aControllerStateTransaction.get_compiled_changes()
+
+        self._controller_state_manager.commit_state(aController, changes)
+
+        # Empty transaction
+        aControllerStateTransaction.clear() # as callback?
+
+
+class ControllerStateTransaction:
     def __init__(self):
-        self.states = defaultdict(ControllerState)
+        self.dirty_blocks = []
+
+    def add(self, aBlock):
+        self.dirty_blocks.append(aBlock)
+
+    def clear(self):
+        """
+        Clear transaction
+        """
+        self.dirty_blocks = []
+
+    def get_compiled_changes(self):
+        # Do something
+        # Collect changed fields
+        changes = []
+
+        for block in self.dirty_blocks:
+            for fieldname in block.get_dirty_fields():
+                field = getattr(block, fieldname)
+                changes.append((block, fieldname, field.get_requested_value()))
+
+        return changes
+
+class ControllerStateManager(Component):
+    def __init__(self):
+        self.states = defaultdict(lambda: ControllerState(self))
+        super(ControllerStateManager, self).__init__()
 
     def get_for_controller(self, aController):
         return self.states[aController]
 
-ControllerStateManager = ControllerStateManager()
+    def commit_state(self, aController, changes):
+        state = self.get_for_controller(aController)
+        for change in changes:
+            state.set_requested(change[0], change[1], change[2])
+
+        self.fire(ControllerStateChangeRequest(aController, changes))
+

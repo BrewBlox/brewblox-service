@@ -51,6 +51,25 @@ class ControllerBlock(BaseObject):
         'with_polymorphic': '*'
     }
 
+    def __setattr__(self, name, value):
+        if name in self.__class__._controller_data_fields:
+            attribute = getattr(self, name)
+            attribute.request_value(value)
+
+            return value
+        else:
+            return super().__setattr__(name, value)
+
+
+    def get_dirty_fields(self):
+        dirty_fields = []
+        for field in self.__class__._controller_data_fields:
+            if getattr(self, field)[2] == True:
+                dirty_fields.append(field)
+
+        return dirty_fields
+
+
     is_static = Column(Boolean, default=False, nullable=False)
 
     profile_id = Column(Integer, ForeignKey('controller_profile.id'), nullable=True)

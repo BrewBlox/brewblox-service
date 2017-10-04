@@ -9,7 +9,6 @@ from sqlalchemy.exc import IntegrityError
 from flask_plugins import emit_event
 
 from brewpi_service import app
-from brewpi_service.controller.state import VolatileStateMeta
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,19 +22,7 @@ db_session = scoped_session(sessionmaker(autocommit=False,
 def shutdown_session(exception=None):
     db_session.remove()
 
-
-class ControllerData(object):
-    def __init__(self, *args, **kwargs):
-        self._writable = False
-
-        if 'writable' in kwargs:
-            self._writable = True
-            kwargs.pop('writable')
-
-        self._args = args
-        self._kwargs = kwargs
-
-        self.actual_value = 2
+from collections import UserList
 
 
 class ControllerCompositeColumn(object):
@@ -46,51 +33,17 @@ class ControllerCompositeColumn(object):
     def __composite_values__(self):
         return self.actual_column, self.requested_column
 
-
-class BaseClsMeta(DeclarativeMeta, VolatileStateMeta):
+from brewpi_service.controller.state import ControllerDataField
+class BaseClsMeta(DeclarativeMeta):
     def __init__(cls, classname, bases, dict_):
+        cls._controller_data_fields = []
 
-        new_fields = {}
-        for name, attribute in dict_.items():
-            if type(attribute) is ControllerData:
-                if attribute._writable:
-                    requested_colname = "_{0}_requested".format(name)
-                    requested_column = Column(requested_colname, *attribute._args, nullable=True, **attribute._kwargs)
-                    new_fields[requested_colname] = requested_column
+        for name, attribute in cls.__dict__.items():
+            if type(attribute) is ControllerDataField:
+                LOGGER.debug("Marking attribute '{0}' as controller state".format(name))
+                cls._controller_data_fields.append(name)
 
-                    actual_colname = "_{0}".format(name)
-                    actual_column = Column(actual_colname, *attribute._args, nullable=True, **attribute._kwargs)
-                    new_fields[actual_colname] = actual_column
-
-                    composite_colname = "{0}".format(name)
-                    new_fields[composite_colname] = composite(ControllerCompositeColumn,
-                                                              actual_column,
-                                                              requested_column)
-                else:
-                    new_fields[name] = Column(name, *attribute._args, **attribute._kwargs)
-
-        # Set new fields
-        dict_.update(new_fields)
-        for new_field_name, new_field in new_fields.items():
-            setattr(cls, new_field_name, dict_[new_field_name])
-
-        DeclarativeMeta.__init__(cls, classname, bases, dict_)
-
-    def __setattr__(cls, name, value):
-        if name in cls.controller_data_fields:
-            attribute = getattr(cls, name)
-            attribute.requested_value = value
-
-            return value
-        else:
-            return super().__setattr__(name, value)
-
-    def __getattribute__(cls, name):
-        if name in cls.controller_data_fields:
-            return getattr(cls, name).actual_value
-        else:
-            return super().__getattr__(name)
-
+        return super(BaseClsMeta, cls).__init__(classname, bases, dict_)
 
 
 Base = declarative_base(metaclass=BaseClsMeta, mapper=mapper)

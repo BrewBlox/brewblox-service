@@ -6,7 +6,7 @@ from sqlalchemy.orm import relationship, backref
 
 from brewpi_service.controller.models import ControllerBlock, BaseObject
 
-from brewpi_service.controller.state import ControllerData, VolatileStateMeta
+from brewpi_service.controller.state import ControllerDataField
 
 from zope.interface import implementer
 
@@ -38,7 +38,7 @@ class SensorSetpointPair(ControllerBlock, ProcessValueMixin):
 
     name = Column(String, nullable=True)
     # value = ControllerData(Float)
-    value = ControllerData(Float)
+    value = ControllerDataField(Float)
 
 
 @implementer(ISensor)
@@ -96,7 +96,7 @@ class PID(ControllerBlock):
                          backref=backref('pid_inputs',
                                          remote_side="ControllerBlock.id"))
 
-    kp = ControllerData(Float, writable=True)
+    kp = ControllerDataField(Float, writable=True)
 
 
     def __repr__(self):

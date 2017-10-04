@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, Integer, ForeignKey
 )
 
-from brewpi_service.database import ControllerData
+from brewpi_service.controller.state import ControllerDataField
 from brewpi_service.controller.models import ControllerBlock
 
 
@@ -17,8 +17,8 @@ class ClockDevice(ControllerBlock):
     }
     id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
 
-    scale = ControllerData(Integer, writable=True)
-    time = ControllerData(Integer)
+    scale = ControllerDataField(Integer, writable=True)
+    time = ControllerDataField(Integer)
 
     def __repr__(self):
         return '<Clock {0} -> {1} (x{2})>'.format(self.id, self.time, self.scale)

@@ -28,17 +28,16 @@ class VirtualBrewPiSyncherBackend(Component, AbstractControllerSyncherBackend):
     """
     A virtual BrewPi Controller for testing purpose
     """
-    def __init__(self):
+    def __init__(self, aControllerStateManager):
         super(VirtualBrewPiSyncherBackend, self).__init__()
 
         self.controller = None
         self.profile = None
         self.controller_state = None
 
+        self._controller_state_manager = aControllerStateManager
+
         self.shutdown = False
-
-
-
 
     def make_profile(self, name):
         """
@@ -76,7 +75,7 @@ class VirtualBrewPiSyncherBackend(Component, AbstractControllerSyncherBackend):
                                      description="A virtual controller",
                                      profile=self.profile)
 
-        self.controller_state = ControllerStateManager.get_for_controller(self.controller)
+        self.controller_state = self._controller_state_manager.get_for_controller(self.controller)
 
         self.fire(ControllerConnected(self.controller))
 
@@ -101,14 +100,24 @@ class VirtualBrewPiSyncherBackend(Component, AbstractControllerSyncherBackend):
 
             # If we get a change from the service/user
             heater1pid = PID.query.filter(PID.name=="heater1pid").one()
-            PID.kp = 10
-            # self.state.flag(PID)
-            print(PID.kp + 2)
-            print(dir(PID))
+
+            heater1pid.kp = 20
+
+            transaction = self.controller_state.begin_transaction()
+            transaction.add(heater1pid)
+            self.controller_state.commit(self.controller,
+                                         transaction) # fire message
 
             self.shutdown = True
             time.sleep(1)
 
+    @handler("ControllerStateChangeRequest")
+    def on_controller_state_change_request(self, event):
+        for change in event.changes:
+            (block, fieldname, requested_value) = change
+            if type(block) == PID:
+                ## SPECIFIC
+                print("do something on the controller with {0} {1} {2}".format(block, fieldname, requested_value))
 
     def on_receive_control_settings(self, control_settings):
         """

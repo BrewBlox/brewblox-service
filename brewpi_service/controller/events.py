@@ -21,6 +21,13 @@ class ControllerBlockList(Event):
         self.blocks = aBlockList
 
 
+class ControllerStateChangeRequest(Event):
+    def __init__(self, aController, changes):
+        super(ControllerStateChangeRequest, self).__init__()
+        self.controller = aController
+        self.changes = changes
+
+        
 class ControllerRequestCurrentProfile(Event):
     pass
 
