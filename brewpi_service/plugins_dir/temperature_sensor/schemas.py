@@ -11,7 +11,7 @@ from .models import (
 )
 
 from .interfaces import (
-    IProcessValue,
+    ISensorSetpointPair,
     ISensor,
     IPID
 )
@@ -19,7 +19,7 @@ from .interfaces import (
 from zope.interface import implementer
 
 
-@implementer(IProcessValue)
+@implementer(ISensorSetpointPair)
 class SensorSetpointPairSchema(ControllerBlockSchema):
     """
     A simple pair of a Sensor and a Setpoint

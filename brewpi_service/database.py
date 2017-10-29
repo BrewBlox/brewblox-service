@@ -79,6 +79,7 @@ def get_or_create(session,
         created = getattr(model, create_method, model)(**kwargs)
         try:
             session.add(created)
+            session.commit()
             return created, True
         except IntegrityError as e:
             session.rollback()

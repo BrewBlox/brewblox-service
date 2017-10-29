@@ -4,27 +4,42 @@ import time
 
 from circuits import handler, Component
 
-from brewpiv2.commands import ListInstalledDevicesCommand
+from brewpiv2.commands import (
+    ControlSettingsCommand,
+    ListInstalledDevicesCommand,
+    ListAvailableDevicesCommand
+)
+from brewpiv2.constants import (
+    HardwareType
+)
 from brewpiv2.controller import (
     BrewPiControllerManager,
     BrewPiController,
     ControllerObserver,
-    MessageHandler
+    MessageHandler,
+    message_received
 )
+
+from brewpi_service.database import db_session
 
 from brewpiv2.messages.decoder import RawMessageDecoder
 
+from brewpi_service.controller.profile import ControllerProfileManager, NoResultFound
 
 from brewpi_service.controller.models import Controller
 from brewpi_service.controller.events import (
     ControllerConnected,
-    ControllerDisconnected
+    ControllerDisconnected,
+    ControllerBlockList
 )
 from brewpi_service.controller.profile import (
     ControllerProfileManager,
     NoResultFound
 )
 from brewpi_service.controller.state import ControllerStateManager
+from brewpi_service.controller.blocks.models import DigitalPin
+
+from brewpi_service.plugins_dir.temperature_sensor.models import TemperatureSensor, PID, SensorSetpointPair, SetpointSimple
 
 
 from ..abstract import AbstractControllerSyncherBackend
@@ -37,14 +52,15 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
     """
     A loop that syncs a BrewPi Controller using the legacy firmware
     """
-    def __init__(self):
+    def __init__(self, aControllerStateManager):
         super(BrewPiLegacySyncherBackend, self).__init__()
 
         self.manager = BrewPiControllerManager()
         self.msg_decoder = RawMessageDecoder()
-        self.msg_handler = SyncherMessageHandler()
 
-        self.controller_observer = BrewPiLegacyControllerObserver().register(self)
+
+        self.controller_state = None
+        self._controller_state_manager = aControllerStateManager
 
         self.shutdown = False
 
@@ -69,30 +85,29 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
 
         beer2_setpoint_pair = SensorSetpointPair(profile=profile,
                                                  setpoint=beer2_setpoint,
-                                                 sensor=beer2_sensor,
+                                                 # sensor=beer2_sensor,
                                                  object_id=50) # not required since static
 
         db_session.add(beer2_setpoint_pair)
 
-        heater2_pwm = ActuatorPwm(profile=profile,
-                                  object_id=53,
-                                  period=4,
-                                  name="heater2pwm")
+        # heater2_pwm = ActuatorPwm(profile=profile,
+        #                           object_id=53,
+        #                           period=4,
+        #                           name="heater2pwm")
 
-        db_session.add(heater2_pwm)
+        # db_session.add(heater2_pwm)
 
         heater2_pid = PID(profile=profile,
                           name="heater2pid",
                           object_id=52,
-                          input=beer1_setpoint_pair,
-                          output=heater2_pwm)
+                          input=beer2_setpoint_pair)
+                          # output=heater2_pwm)
 
         db_session.add(heater2_pid)
 
         db_session.commit()
 
         return profile
-
 
 
     @handler("stopped")
@@ -102,43 +117,72 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
 
     @handler("started")
     def started(self, *args):
-        wifi_ctrl = BrewPiController("socket://192.168.0.54:6666")
+        # Make sure we have our profile
+        profile_name = "brewpiv2"
+        try:
+            self.profile = ControllerProfileManager.get(profile_name)
+        except NoResultFound:
+            self.profile = self.make_profile(name=profile_name)
+
+
+        wifi_ctrl = BrewPiController("socket://192.168.1.6:6666")
         self.manager.controllers[wifi_ctrl.serial_port] = wifi_ctrl
-        wifi_ctrl.subscribe(self.controller_observer)
+        controller_observer = BrewPiLegacyControllerObserver(wifi_ctrl,
+                                                             self.profile,
+                                                             self._controller_state_manager).register(self)
+        wifi_ctrl.subscribe(controller_observer)
         wifi_ctrl.connect()
 
-
         while not self.shutdown:
+            LOGGER.debug("Requesting update from backend {0}".format(self))
             # Update manager
             for new_controller in self.manager.update():
-                time.sleep(1)  # FIXME ugly
-                new_controller.subscribe(self.controller_observer)
+                controller_observer = BrewPiLegacyControllerObserver(new_controller,
+                                                                     self.profile,
+                                                                     self._controller_state_manager).register(self)
+
+                new_controller.subscribe(controller_observer)
                 new_controller.connect()
 
             # Process messages from controllers
             for port, controller in self.manager.controllers.items():
                 if controller.is_connected:
-                    # Read values of devices
-                    controller.send(ListInstalledDevicesCommand(with_values=True))
-                    time.sleep(1)
+
+                    # Request list of available devices with values
+                    controller.send(ListAvailableDevicesCommand(with_values=True))
 
                     for raw_message in controller.process_messages():
                         for msg in self.msg_decoder.decode_controller_message(raw_message):
-                            self.msg_handler.accept(msg)
-                            LOGGER.debug(msg)
+                            controller.notify(message_received, msg)
 
-            time.sleep(0.5)
+                            # LOGGER.debug(msg)
+
+            time.sleep(2)
+
+    def __str__(self):
+        return "BrewPi Legacy Backend"
 
 
 class SyncherMessageHandler(MessageHandler):
     """
     Take actions upon Controller Message reception
     """
+    def __init__(self):
+        self.updated_blocks = []
+
+    def clear_updates(self):
+        """
+        Once updates have been treated, clear them for next update
+        """
+        self.updated_blocks = []
+
     def installed_device(self, anInstalledDeviceMessage):
         LOGGER.warn("TBI: update installed device!")
 
-    def available_device(self, anAvailableDeviceMessage):
-        LOGGER.warn("TBI: update available device!")
+    def available_device(self, aDevice):
+        if aDevice.hardware_type == HardwareType.DIGITAL_PIN:
+            self.updated_blocks.append(DigitalPin(pin_number=aDevice.pin,
+                                                   is_inverted=aDevice.pin_inverted))
 
     def uninstalled_device(self, anUninstalledDeviceMessage):
         LOGGER.warn("TBI: update uninstalled device!")
@@ -163,6 +207,16 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
     Receives events from the backend and dispatch them as events the service
     can understand.
     """
+    def __init__(self, aController, aControllerProfile, aControllerStateManager):
+        super(BrewPiLegacyControllerObserver, self).__init__()
+
+        self.controller_device = aController
+        self.controller = None
+        self.profile = aControllerProfile
+        self.controller_state_manager = aControllerStateManager
+
+        self.msg_handler = SyncherMessageHandler()
+
     def _make_controller_uri(self, aBrewPiController):
         """
         Forge the controller uri as a string
@@ -170,14 +224,53 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
         return "{0}:{1}".format(platform.node(),
                                 aBrewPiController.serial_port)
 
+
+
+    @handler("ControllerStateChangeRequest")
+    def on_controller_state_change_request(self, event):
+        for change in event.changes:
+            (block, fieldname, requested_value) = change
+            if type(block) == PID:
+                ## SPECIFIC
+                print("post changes to controller {0} with {1} {2} {3}".format(self.controller, block, fieldname, requested_value))
+                self.controller_device.send(ControlSettingsCommand(heater1_kp=requested_value))
+
+
+    def _on_message_received(self, aMessage):
+        """
+        When a message has been received from the controller
+        """
+        self.msg_handler.accept(aMessage)
+
+        for block in self.msg_handler.updated_blocks:
+            print(block)
+
     def _on_controller_connected(self, aBrewPiController):
-        controller = Controller(name="Serial BrewPi on {0} at {1}".format(platform.node(),
-                                                                          aBrewPiController.serial_port),
+        controller = Controller(name="BrewPi with legacy firmware on {0} at {1}".format(platform.node(),
+                                                                                        aBrewPiController.serial_port),
+                                profile=self.profile,
                                 uri=self._make_controller_uri(aBrewPiController),
                                 description="A BrewPi connected to a serial port, using the legacy protocol.",
                                 connected=aBrewPiController.is_connected)
 
+        self.controller = controller
+
         self.fire(ControllerConnected(controller))
+
+        time.sleep(2)
+
+        self.controller_state = self.controller_state_manager.get_for_controller(self.controller)
+
+        # If we get a change from the service/user
+        heater2pid = PID.query.filter(PID.profile==self.profile,
+                                      PID.name=="heater2pid").one()
+
+        heater2pid.kp = 20
+
+        transaction = self.controller_state.begin_transaction()
+        transaction.add(heater2pid)
+        self.controller_state.commit(self.controller,
+                                     transaction) # fire message
 
     def _on_controller_disconnected(self, aBrewPiController):
         self.fire(ControllerDisconncted(Controller(uri=self._make_controller_uri(aBrewPiController))))

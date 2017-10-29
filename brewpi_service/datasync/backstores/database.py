@@ -4,7 +4,9 @@ from circuits import Component, handler
 
 from sqlalchemy.exc import IntegrityError
 
-from brewpi_service.database import db_session, get_or_create
+from sqlalchemy.orm import scoped_session, sessionmaker
+
+from brewpi_service.database import engine, get_or_create
 from brewpi_service.controller.models import Controller
 from brewpi_service.controller.models import ControllerBlock
 
@@ -18,11 +20,23 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
     """
     Synchronize backend events to a Database using SQLAlchemy
     """
+
+    def init(self):
+        self.session = scoped_session(sessionmaker(autocommit=False,
+                                                   autoflush=False,
+                                                   bind=engine))
+
+    @handler("started")
+    def started(self, *args):
+        # Mark all controllers as disconnected
+        self.session.query(Controller).update({Controller.connected: False})
+        self.session.commit()
+
     @handler("ControllerConnected")
     def on_controller_appeared(self, event):
         aController = event.controller
 
-        controller, created = get_or_create(db_session, Controller,
+        controller, created = get_or_create(self.session, Controller,
                                             create_method_kwargs={'name': aController.name,
                                                                   'description': aController.description,
                                                                   'connected': True,

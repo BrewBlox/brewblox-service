@@ -21,15 +21,13 @@ class DataSyncherServer(Component):
     Main synching process that spawns hardware backends in threadsand triggers
     backstores on events.
     """
-    def __init__(self):
-        super(DataSyncherServer, self).__init__()
-
+    def init(self):
         self._state_manager = ControllerStateManager().register(self)
 
         self._backstores = (DatabaseSyncher().register(self))
         self._forwarders = (SSEForwarder().register(self))
-        self._backends = (VirtualBrewPiSyncherBackend(self._state_manager).register(self))
-
+        # self._backends = (VirtualBrewPiSyncherBackend(self._state_manager).register(self))
+        self._backends = (BrewPiLegacySyncherBackend(self._state_manager).start(process=False, link=self))
 
 
     @handler("started")

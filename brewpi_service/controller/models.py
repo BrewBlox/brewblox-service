@@ -70,7 +70,7 @@ class ControllerBlock(BaseObject):
         return dirty_fields
 
 
-    is_static = Column(Boolean, default=False, nullable=False)
+    is_static = Column(Boolean, default=False, nullable=False, doc="whether the object is hardcoded on the controller or user-creatable")
 
     profile_id = Column(Integer, ForeignKey('controller_profile.id'), nullable=True)
     profile = relationship("models.ControllerProfile")
@@ -119,4 +119,3 @@ class ControllerProfile(Base):
 
     def __repr__(self):
         return "{0}[{1}]".format(self.name, 'S' if self.is_static else 'D')
-

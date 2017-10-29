@@ -109,5 +109,6 @@ class ControllerStateManager(Component):
         for change in changes:
             state.set_requested(change[0], change[1], change[2])
 
+        LOGGER.debug("Commiting changes for controller {0}".format(aController))
         self.fire(ControllerStateChangeRequest(aController, changes))
 

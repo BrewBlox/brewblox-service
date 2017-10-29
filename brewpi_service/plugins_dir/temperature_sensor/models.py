@@ -59,8 +59,8 @@ class SensorSetpointPair(ControllerBlock):
     setpoint_id = Column(Integer, ForeignKey('controller_block.id'))
     setpoint = relationship("ControllerBlock", primaryjoin="and_(SensorSetpointPair.setpoint_id==ControllerBlock.id)", backref="setpoint_setpoint_pair")
 
-    sensor_id = Column(Integer, ForeignKey('controller_block.id'))
-    sensor = relationship("ControllerBlock", primaryjoin="and_(SensorSetpointPair.sensor_id==ControllerBlock.id)", backref="sensor_setpoint_pair")
+    # sensor_id = Column(Integer, ForeignKey('controller_block.id'))
+    # sensor = relationship("ControllerBlock", primaryjoin="and_(SensorSetpointPair.sensor_id==ControllerBlock.id)", backref="sensor_setpoint_pair")
 
     def __repr__(self):
         return '<SetPointPair set:{0}/{1}>'.format(self.setpoint, self.sensor)
