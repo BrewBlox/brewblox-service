@@ -54,7 +54,11 @@ class ControllerBlock(BaseObject):
     def __setattr__(self, name, value):
         if name in self.__class__._controller_data_fields:
             attribute = getattr(self, name)
-            attribute.request_value(value)
+            if type(value) is tuple:
+                attribute.set_actual_value(value[0])
+                attribute.request_value(value[1])
+            else:
+                attribute.request_value(value)
 
             return value
         else:

@@ -55,7 +55,7 @@ class TemperatureSensorSchema(ControllerBlockSchema):
         fields = ControllerBlockSchema.Meta.fields + ('value', 'url')
 
     value = ControllerData(attribute='value')
-    
+
 
 @implementer(IPID)
 class PIDSchema(ControllerBlockSchema):
@@ -66,4 +66,6 @@ class PIDSchema(ControllerBlockSchema):
         model = PID
         fields = ControllerBlockSchema.Meta.fields + ('input', 'actuator', 'setpoint', 'url')
 
+    actuator = ma.HyperlinkRelated('controllerblockdetail')
+    setpoint = ma.HyperlinkRelated('controllerblockdetail')
     input = ma.HyperlinkRelated('controllerblockdetail')

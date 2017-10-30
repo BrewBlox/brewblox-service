@@ -105,13 +105,6 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
         LOGGER.info("Making BrewPi v2 Profile into database under name '{0}'...".format(name))
         profile = ControllerProfileManager.create(name)
 
-        beer2_sensor = TemperatureSensor(profile=profile,
-                                         is_static=True,
-                                         object_id=49,
-                                         name="beer2")
-
-        db_session.add(beer2_sensor)
-
         beer2_setpoint = SetpointSimple(profile=profile,
                                         is_static=True,
                                         object_id=51,
@@ -247,10 +240,11 @@ class SyncherMessageHandler(MessageHandler):
                                                   is_inverted=aDevice.pin_inverted))
 
         elif aDevice.hardware_type == HardwareType.TEMP_SENSOR:
+            print(aDevice.value)
             self.updated_blocks.append(TemperatureSensor(object_id=self.available_device_pool.get_id_for(aDevice),
                                                          profile=self.controller_profile,
                                                          profile_id=self.controller_profile.id,
-                                                         value=aDevice.value,
+                                                         value=(aDevice.value, aDevice.value), # Set actual value
                                                          name="1-Wire Temperature Sensor@{0}".format(aDevice.address)))
         else:
             LOGGER.debug("Unknown device to synch: {0}".format(aDevice))

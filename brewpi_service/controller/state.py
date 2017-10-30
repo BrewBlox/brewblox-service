@@ -24,9 +24,13 @@ class ControllerDataField(UserList):
 
         super(ControllerDataField, self).__init__([None, None, False])
 
+    def set_actual_value(self, value):
+        self.data[ControllerDataField.ACTUAL] = value
+
     def request_value(self, value):
-        self.data[ControllerDataField.REQUESTED] = value
-        self.data[ControllerDataField.DIRTY] = True
+        if value != self.get_actual_value():
+            self.data[ControllerDataField.REQUESTED] = value
+            self.data[ControllerDataField.DIRTY] = True
 
     def get_requested_value(self):
         return self.data[ControllerDataField.REQUESTED]
@@ -34,7 +38,7 @@ class ControllerDataField(UserList):
     def get_actual_value(self):
         return self.data[ControllerDataField.ACTUAL]
 
-    
+
 class BlockState(defaultdict):
     def __init__(self):
         super(BlockState, self).__init__(lambda: [None, None])
@@ -114,4 +118,3 @@ class ControllerStateManager(Component):
 
         LOGGER.debug("Commiting changes for controller {0}".format(aController))
         self.fire(ControllerStateChangeRequest(aController, changes))
-
