@@ -39,7 +39,7 @@ class SetpointSimple(ControllerBlock):
     value = ControllerDataField(Float)
 
     def __repr__(self):
-        return "<SetpointSimple '{0}':{1}".format(self.name,
+        return "<SetpointSimple '{0}':{1}>".format(self.name,
                                                   self.value)
 
 

@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from sqlalchemy.orm import scoped_session, sessionmaker
 
-from brewpi_service.database import engine, get_or_create
+from brewpi_service.database import engine, get_or_create, db_session
 from brewpi_service.controller.models import Controller
 from brewpi_service.controller.models import ControllerBlock
 
@@ -43,20 +43,22 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
                                                                   'profile_id': aController.profile.id},
                                             uri=aController.uri)
 
-
         if created is False:
             LOGGER.debug("Controller has reconnected: {0}".format(controller))
         else:
             LOGGER.debug("New Controller connected: {0}".format(controller))
+
         controller.connected = True
-        # FIXME Do we need to write the DB?
+
+        self.session.commit()
+
 
     @handler("ControllerDisconnected")
     def on_controller_disappeared(self, event):
         aController = event.controller
 
         LOGGER.debug("Controller disconnected: {0}".format(aController.uri))
-        controller = db_session.query(Controller).filter(Controller.uri == aController.uri).first()
+        controller = self.session.query(Controller).filter(Controller.uri == aController.uri).first()
         controller.connected = False
 
         db_session.commit()
@@ -74,13 +76,13 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
 
         for block in event.blocks:
             # Check if we already have a block of this ID
-            existing_block = db_session.query(ControllerBlock).filter(Controller.id==block.controller_id,
+            existing_block = db_session.query(ControllerBlock).filter(ControllerBlock.profile_id==block.profile.id,
                                                                       ControllerBlock.object_id==block.object_id).first()
 
             if existing_block is not None:
                 # Check we have the same type in DB as we have in controller's memory
-                typed_block = db_session.query(type(block)).filter(Controller.uri==block.controller.uri,
-                                                                   object_id=block.object_id).one()
+                typed_block = db_session.query(type(block)).filter(ControllerBlock.profile_id==block.profile.id,
+                                                                   ControllerBlock.object_id==block.object_id).one()
 
                 if typed_block is None:
                     # FIXME: Type mismatch, what should we do?

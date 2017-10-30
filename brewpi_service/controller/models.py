@@ -75,7 +75,7 @@ class ControllerBlock(BaseObject):
     profile_id = Column(Integer, ForeignKey('controller_profile.id'), nullable=True)
     profile = relationship("models.ControllerProfile")
 
-    object_id = Column(Integer, nullable=False)
+    object_id = Column(Integer, nullable=True)
     name = Column(String, nullable=True)
 
     __table_args__ = (

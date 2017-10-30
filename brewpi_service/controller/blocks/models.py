@@ -11,5 +11,16 @@ from .interfaces import ISwitchActuator
 
 @implementer(ISwitchActuator)
 class DigitalPin(ControllerBlock):
+    __tablename__ = 'controller_block_digital_pin'
+
+    __mapper_args__ = {
+        'polymorphic_identity': "controller_block_digital_pin"
+    }
+
+    digital_pin_id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
+
     is_inverted = Column(Boolean)
     pin_number = Integer()
+
+    def __repr__(self):
+        return "<DigitalPin '{0}'>".format(self.name)

@@ -1,6 +1,7 @@
 import logging
 import platform
 import time
+from datetime import datetime, timedelta
 
 from circuits import handler, Component
 
@@ -133,7 +134,12 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
         wifi_ctrl.subscribe(controller_observer)
         wifi_ctrl.connect()
 
+        last_update = datetime.now()
+
         while not self.shutdown:
+            while (datetime.now() - last_update) < timedelta(seconds=2):
+                yield
+
             LOGGER.debug("Requesting update from backend {0}".format(self))
             # Update manager
             for new_controller in self.manager.update():
@@ -157,7 +163,9 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
 
                             # LOGGER.debug(msg)
 
-            time.sleep(2)
+            last_update = datetime.now()
+
+
 
     def __str__(self):
         return "BrewPi Legacy Backend"
@@ -167,8 +175,9 @@ class SyncherMessageHandler(MessageHandler):
     """
     Take actions upon Controller Message reception
     """
-    def __init__(self):
+    def __init__(self, aControllerProfile):
         self.updated_blocks = []
+        self.controller_profile = aControllerProfile
 
     def clear_updates(self):
         """
@@ -181,8 +190,11 @@ class SyncherMessageHandler(MessageHandler):
 
     def available_device(self, aDevice):
         if aDevice.hardware_type == HardwareType.DIGITAL_PIN:
-            self.updated_blocks.append(DigitalPin(pin_number=aDevice.pin,
-                                                   is_inverted=aDevice.pin_inverted))
+            self.updated_blocks.append(DigitalPin(profile=self.controller_profile,
+                                                  profile_id=self.controller_profile.id,
+                                                  name="Digital Pin {0}".format(aDevice.pin),
+                                                  pin_number=aDevice.pin,
+                                                  is_inverted=aDevice.pin_inverted))
 
     def uninstalled_device(self, anUninstalledDeviceMessage):
         LOGGER.warn("TBI: update uninstalled device!")
@@ -215,7 +227,7 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
         self.profile = aControllerProfile
         self.controller_state_manager = aControllerStateManager
 
-        self.msg_handler = SyncherMessageHandler()
+        self.msg_handler = SyncherMessageHandler(self.profile)
 
     def _make_controller_uri(self, aBrewPiController):
         """
@@ -231,19 +243,20 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
         for change in event.changes:
             (block, fieldname, requested_value) = change
             if type(block) == PID:
-                ## SPECIFIC
+                ## FIXME SPECIFIC
                 print("post changes to controller {0} with {1} {2} {3}".format(self.controller, block, fieldname, requested_value))
                 self.controller_device.send(ControlSettingsCommand(heater1_kp=requested_value))
 
 
     def _on_message_received(self, aMessage):
         """
-        When a message has been received from the controller
+        When a message is received from the controller
         """
         self.msg_handler.accept(aMessage)
 
-        for block in self.msg_handler.updated_blocks:
-            print(block)
+        self.fire(ControllerBlockList(self.controller, self.msg_handler.updated_blocks))
+
+        self.msg_handler.clear_updates()
 
     def _on_controller_connected(self, aBrewPiController):
         controller = Controller(name="BrewPi with legacy firmware on {0} at {1}".format(platform.node(),
