@@ -40,14 +40,14 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
                                             create_method_kwargs={'name': aController.name,
                                                                   'description': aController.description,
                                                                   'connected': True,
-                                                                  'profile_id': aController.profile.id},
+                                                                  'profile_id': aController.profile_id},
                                             uri=aController.uri)
 
         if created is False:
             LOGGER.debug("Controller has reconnected: {0}".format(controller))
             controller.connected = True
 
-            self._clean_old_available_blocks_for(controller.profile, self.session)
+            self._wipe_available_blocks_for(controller.profile, self.session)
 
         else:
             LOGGER.debug("New Controller connected: {0}".format(controller))
@@ -55,26 +55,40 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
 
         self.session.commit()
 
-    def _clean_old_available_blocks_for(self, aControllerProfile, aDBSession):
+    def _wipe_available_blocks_for(self, aControllerProfile, aDBSession):
         """
-        Remove all stale available blocks
+        Remove all available blocks
         """
         aDBSession.query(ControllerBlock).filter(ControllerBlock.profile_id==aControllerProfile.id,
                                                  ControllerBlock.object_id<0).delete(synchronize_session=False)
 
+    def _clean_stale_available_blocks_for(self, aControllerProfile, time_limit, aDBSession):
+        """
+        Remove all stale available blocks (not updated since a few seconds)
+        """
+        aDBSession.query(ControllerBlock).filter(ControllerBlock.profile_id==aControllerProfile.id,
+                                                 ControllerBlock.object_id<0,
+                                                 ControllerBlock.updated_at<=time_limit).delete(synchronize_session=False)
 
     @handler("ControllerDisconnected")
     def on_controller_disappeared(self, event):
         aController = event.controller
 
         LOGGER.debug("Controller disconnected: {0}".format(aController.uri))
-        controller = self.session.query(Controller).filter(Controller.uri == aController.uri).first()
+        controller = db_session.query(Controller).filter(Controller.uri==aController.uri).first()
         controller.connected = False
+
+        self._wipe_available_blocks_for(controller.profile, db_session)
 
         db_session.commit()
 
-        self._clean_old_available_blocks_for(controller.profile, db_session)
+    @handler("ControllerCleanStaleAvailableBlocks")
+    def on_clean_stale_available_blocks(self, event):
+        LOGGER.debug("Cleaning Stale Available Blocks for controller {0}".format(event.controller))
 
+        controller = db_session.query(Controller).filter(Controller.uri==event.controller.uri).first()
+        self._clean_stale_available_blocks_for(controller.profile, event.time_limit, db_session)
+        db_session.flush()
 
     @handler("ControllerBlockList")
     def on_controller_block_list(self, event):
@@ -99,13 +113,20 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
                 if typed_block is None:
                     # FIXME: Type mismatch, what should we do?
                     LOGGER.error("Type mismatch between Controller and Database, fix that by hand!")
+
+                # just mark it updated
+                from datetime import datetime
+                existing_block.updated_at = datetime.utcnow()
+                db_session.add(existing_block)
             else:
-                try:
-                    LOGGER.debug("Adding block :{0}".format(block))
-                    db_session.add(block)
-                    db_session.commit()
-                except IntegrityError as e:
-                    db_session.rollback()
-                    LOGGER.error(e)
+                LOGGER.debug("Adding block :{0}".format(block))
+                db_session.add(block)
 
                 LOGGER.debug("New object synched from controller memory: {0}".format(block))
+
+        try:
+            db_session.commit()
+        except IntegrityError as e:
+            db_session.rollback()
+            LOGGER.error(e)
+

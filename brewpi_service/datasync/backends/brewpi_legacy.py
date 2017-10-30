@@ -32,7 +32,8 @@ from brewpi_service.controller.models import Controller
 from brewpi_service.controller.events import (
     ControllerConnected,
     ControllerDisconnected,
-    ControllerBlockList
+    ControllerBlockList,
+    ControllerCleanStaleAvailableBlocks
 )
 from brewpi_service.controller.profile import (
     ControllerProfileManager,
@@ -90,9 +91,9 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
         self.manager = BrewPiControllerManager()
         self.msg_decoder = RawMessageDecoder()
 
-
-        self.controller_state = None
         self._controller_state_manager = aControllerStateManager
+
+        self.controller_observers = []
 
         self.shutdown = False
 
@@ -172,10 +173,10 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
 
     @handler("started")
     def started(self, *args):
-        last_update = datetime.now()
+        last_update = datetime.utcnow()
 
         while not self.shutdown:
-            if (datetime.now() - last_update) > timedelta(seconds=5):
+            if (datetime.utcnow() - last_update) > timedelta(seconds=5):
                 LOGGER.debug("Requesting controller update from backend {0}".format(self))
 
                 # Request list of available devices with values
@@ -183,14 +184,19 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
                     if controller.is_connected:
                         controller.send(ListAvailableDevicesCommand(with_values=True))
 
-                last_update = datetime.now()
+                # Clean up every cycle
+                for observer in self.controller_observers:
+                    observer.cleanup(last_update)
 
+                last_update = datetime.utcnow()
 
             # Update manager
             for new_controller in self.manager.update():
                 controller_observer = BrewPiLegacyControllerObserver(new_controller,
                                                                      self.profile,
                                                                      self._controller_state_manager).register(self)
+
+                self.controller_observers.append(controller_observer)
 
                 new_controller.subscribe(controller_observer)
                 new_controller.connect()
@@ -201,6 +207,10 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
                     for raw_message in controller.process_messages():
                         for msg in self.msg_decoder.decode_controller_message(raw_message):
                             controller.notify(message_received, msg)
+
+            # Dispatch updates to backstores
+            for observer in self.controller_observers:
+                observer.dispatch_and_clear_updates()
 
             yield
 
@@ -245,7 +255,6 @@ class SyncherMessageHandler(MessageHandler):
         else:
             LOGGER.debug("Unknown device to synch: {0}".format(aDevice))
 
-
     def uninstalled_device(self, anUninstalledDeviceMessage):
         LOGGER.warn("TBI: update uninstalled device!")
 
@@ -276,6 +285,7 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
         self.controller = None
         self.profile = aControllerProfile
         self.controller_state_manager = aControllerStateManager
+        self.controller_state = None
 
         self.msg_handler = SyncherMessageHandler(self.profile)
 
@@ -286,8 +296,6 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
         return "{0}:{1}".format(platform.node(),
                                 aBrewPiController.serial_port)
 
-
-
     @handler("ControllerStateChangeRequest")
     def on_controller_state_change_request(self, event):
         for change in event.changes:
@@ -297,21 +305,22 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
                 print("post changes to controller {0} with {1} {2} {3}".format(self.controller, block, fieldname, requested_value))
                 self.controller_device.send(ControlSettingsCommand(heater1_kp=requested_value))
 
-
     def _on_message_received(self, aMessage):
         """
         When a message is received from the controller
         """
         self.msg_handler.accept(aMessage)
 
-        self.fire(ControllerBlockList(self.controller, self.msg_handler.updated_blocks))
+    def dispatch_and_clear_updates(self):
+        if len(self.msg_handler.updated_blocks) > 0:
+            self.fire(ControllerBlockList(self.controller, self.msg_handler.updated_blocks))
 
         self.msg_handler.clear_updates()
 
     def _on_controller_connected(self, aBrewPiController):
         controller = Controller(name="BrewPi with legacy firmware on {0} at {1}".format(platform.node(),
                                                                                         aBrewPiController.serial_port),
-                                profile=self.profile,
+                                profile_id=self.profile.id,
                                 uri=self._make_controller_uri(aBrewPiController),
                                 description="A BrewPi connected to a serial port, using the legacy protocol.",
                                 connected=aBrewPiController.is_connected)
@@ -335,3 +344,6 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
 
     def _on_controller_disconnected(self, aBrewPiController):
         self.fire(ControllerDisconnected(self.controller))
+
+    def cleanup(self, limit_time):
+        self.fire(ControllerCleanStaleAvailableBlocks(self.controller, limit_time))

@@ -33,3 +33,14 @@ class ControllerStateChangeRequest(Event):
 class ControllerRequestCurrentProfile(Event):
     pass
 
+
+class ControllerCleanStaleAvailableBlocks(Event):
+    """
+    Ask persisting backstores to remove all stale blocks
+    """
+    def __init__(self, aController, time_limit):
+        super(ControllerCleanStaleAvailableBlocks, self).__init__()
+        self.controller = aController
+        self.time_limit = time_limit
+
+
