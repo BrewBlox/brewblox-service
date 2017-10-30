@@ -18,7 +18,7 @@ CONFIG = {
     'APISPEC_SWAGGER_URL': '/specs.json',
     'APISPEC_SWAGGER_UI_URL': None,
     "SECRET_KEY": 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT',
-    "SQLALCHEMY_DATABASE_URI": 'sqlite:///brewpi-service.db',
+    "DATABASE_URI": 'postgresql+psycopg2://bbox_service:coincoin@localhost/bbox_service',
     "RQ_REDIS_URL": "redis://localhost:6379",
     "SSE_REDIS_URL": "redis://localhost"
 }

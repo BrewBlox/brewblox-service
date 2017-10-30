@@ -17,7 +17,7 @@ class DigitalPin(ControllerBlock):
         'polymorphic_identity': "controller_block_digital_pin"
     }
 
-    digital_pin_id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
+    digital_pin_id = Column(Integer, ForeignKey('controller_block.id', ondelete="CASCADE"), primary_key=True)
 
     is_inverted = Column(Boolean)
     pin_number = Integer()

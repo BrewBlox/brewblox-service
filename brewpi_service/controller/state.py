@@ -31,7 +31,10 @@ class ControllerDataField(UserList):
     def get_requested_value(self):
         return self.data[ControllerDataField.REQUESTED]
 
+    def get_actual_value(self):
+        return self.data[ControllerDataField.ACTUAL]
 
+    
 class BlockState(defaultdict):
     def __init__(self):
         super(BlockState, self).__init__(lambda: [None, None])

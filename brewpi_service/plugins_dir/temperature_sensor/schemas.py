@@ -1,23 +1,39 @@
+from marshmallow import fields
 from brewpi_service import ma
 
 from brewpi_service.controller.schemas import (
     ControllerBlockSchema,
 )
 
+from brewpi_service.controller.fields import ControllerData
+
 from .models import (
     TemperatureSensor,
     PID,
-    SensorSetpointPair
+    SensorSetpointPair,
+    SetpointSimple
 )
 
 from .interfaces import (
-    ISensorSetpointPair,
     ISensor,
+    ISetpoint,
+    ISensorSetpointPair,
     IPID
 )
 
 from zope.interface import implementer
 
+
+@implementer(ISetpoint)
+class SetpointSimpleSchema(ControllerBlockSchema):
+    """
+    A Simple setpoint
+    """
+    class Meta:
+        model = SetpointSimple
+        fields = ControllerBlockSchema.Meta.fields + ('value',)
+
+    value = ControllerData(attribute='value')
 
 @implementer(ISensorSetpointPair)
 class SensorSetpointPairSchema(ControllerBlockSchema):
@@ -26,6 +42,7 @@ class SensorSetpointPairSchema(ControllerBlockSchema):
     """
     class Meta:
         model = SensorSetpointPair
+        fields = ControllerBlockSchema.Meta.fields
 
 
 @implementer(ISensor)
@@ -35,10 +52,10 @@ class TemperatureSensorSchema(ControllerBlockSchema):
     """
     class Meta:
         model = TemperatureSensor
-        fields = ('id', 'value', 'url')
+        fields = ControllerBlockSchema.Meta.fields + ('value', 'url')
 
-    url = ma.AbsoluteUrlFor('temperaturesensor.details_view', id='<id>')
-
+    value = ControllerData(attribute='value')
+    
 
 @implementer(IPID)
 class PIDSchema(ControllerBlockSchema):
@@ -47,6 +64,6 @@ class PIDSchema(ControllerBlockSchema):
     """
     class Meta:
         model = PID
-        fields = ('id', 'input', 'actuator', 'setpoint', 'url')
+        fields = ControllerBlockSchema.Meta.fields + ('input', 'actuator', 'setpoint', 'url')
 
-    url = ma.AbsoluteUrlFor('pid.details_view', id='<id>')
+    input = ma.HyperlinkRelated('controllerblockdetail')

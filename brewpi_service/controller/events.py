@@ -11,7 +11,9 @@ class ControllerConnected(Event):
 
 
 class ControllerDisconnected(Event):
-    pass
+    def __init__(self, aController):
+        super(ControllerDisconnected, self).__init__()
+        self.controller = aController
 
 
 class ControllerBlockList(Event):
@@ -27,7 +29,7 @@ class ControllerStateChangeRequest(Event):
         self.controller = aController
         self.changes = changes
 
-        
+
 class ControllerRequestCurrentProfile(Event):
     pass
 

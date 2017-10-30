@@ -1,4 +1,8 @@
+from brewpi_service import ma
+
 from zope.interface import implementer
+
+from ..schemas import ControllerBlockDisambiguator, ControllerBlockSchema
 
 from .interfaces import ISwitchActuator
 
@@ -12,6 +16,7 @@ class DigitalPinSchema(ControllerBlockSchema):
     """
     class Meta:
         model = DigitalPin
-        fields = ('id', 'name', 'url')
+        fields = ControllerBlockSchema.Meta.fields
 
-    url = ma.AbsoluteUrlFor('digital_pin.details_view', id='<id>')
+
+ControllerBlockDisambiguator.class_to_schema[DigitalPin.__name__] = DigitalPinSchema

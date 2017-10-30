@@ -11,7 +11,9 @@ from brewpi_service.controller.state import ControllerDataField
 from zope.interface import implementer
 
 from .interfaces import (
-    ISensorSetpointPair, ISensor
+    ISetpoint,
+    ISensorSetpointPair,
+    ISensor
 )
 
 class ProcessValueMixin(BaseObject):
@@ -22,6 +24,7 @@ class ProcessValueMixin(BaseObject):
     }
 
 
+@implementer(ISetpoint)
 class SetpointSimple(ControllerBlock):
     """
     A Simple Setpoint
@@ -32,7 +35,7 @@ class SetpointSimple(ControllerBlock):
         'polymorphic_identity': "controller_block_setpoint_simple"
     }
 
-    simple_setpoint_id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
+    simple_setpoint_id = Column(Integer, ForeignKey('controller_block.id', ondelete='CASCADE'), primary_key=True)
 
     name = Column(String, nullable=True)
 
@@ -56,14 +59,14 @@ class SensorSetpointPair(ControllerBlock):
 
     # sensor_setpoint_pair_id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
 
-    setpoint_id = Column(Integer, ForeignKey('controller_block.id'))
+    setpoint_id = Column(Integer, ForeignKey('controller_block.id', ondelete='CASCADE'))
     setpoint = relationship("ControllerBlock", primaryjoin="and_(SensorSetpointPair.setpoint_id==ControllerBlock.id)", backref="setpoint_setpoint_pair")
 
     # sensor_id = Column(Integer, ForeignKey('controller_block.id'))
     # sensor = relationship("ControllerBlock", primaryjoin="and_(SensorSetpointPair.sensor_id==ControllerBlock.id)", backref="sensor_setpoint_pair")
 
     def __repr__(self):
-        return '<SetPointPair set:{0}/{1}>'.format(self.setpoint, self.sensor)
+        return '<SetPointPair set:{0}>'.format(self.setpoint)
 
 
 
@@ -77,12 +80,12 @@ class TemperatureSensor(ControllerBlock):
     __mapper_args__ = {
         'polymorphic_identity': "controller_block_ds2xxx_sensor"
     }
-    ds2xxx_sensor_id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
+    ds2xxx_sensor_id = Column(Integer, ForeignKey('controller_block.id', ondelete="CASCADE"), primary_key=True)
 
-    # value = ControllerData(Integer)
+    value = ControllerDataField(Float)
 
     def __repr__(self):
-        return '<Temperature Sensor {0} -> {1}>'.format(self.ds2xxx_sensor_id, self.value)
+        return "<Temperature Sensor '{0} at {1}°C'>".format(self.name, self.value)
 
 
 class PID(ControllerBlock):
@@ -93,7 +96,7 @@ class PID(ControllerBlock):
     """
     __tablename__ = 'controller_block_pid'
 
-    id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
+    id = Column(Integer, ForeignKey('controller_block.id', ondelete='CASCADE'), primary_key=True)
 
     __mapper_args__ = {
         'polymorphic_identity': "controller_block_pid",

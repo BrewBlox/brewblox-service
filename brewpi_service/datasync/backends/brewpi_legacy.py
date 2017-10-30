@@ -2,6 +2,7 @@ import logging
 import platform
 import time
 from datetime import datetime, timedelta
+from collections import OrderedDict
 
 from circuits import handler, Component
 
@@ -48,6 +49,36 @@ from ..abstract import AbstractControllerSyncherBackend
 
 LOGGER = logging.getLogger(__name__)
 
+class AvailableDevicePool:
+    """
+    Patch Object to assign an ID to available devices (which otherwise defaults
+    to -1). The goal is to help trace them when updating.
+    """
+    def __init__(self):
+        self._devices = {}
+
+    def find_free_id(self):
+        used_ids = self._devices.values()
+        for i in range(10, 100):
+            if -i not in used_ids:
+                return -i
+
+        raise Exception # FIXME
+
+    def _hash_device(self, aDevice):
+        return hash((aDevice.slot, aDevice.hardware_type, aDevice.pin, aDevice.address))
+
+    def get_id_for(self, aDevice):
+        id = None
+        try:
+            id = self._devices[self._hash_device(aDevice)]
+        except KeyError:
+            new_id = self.find_free_id()
+            self._devices[self._hash_device(aDevice)] = new_id
+            id = new_id
+
+        return id
+
 
 class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
     """
@@ -66,26 +97,29 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
         self.shutdown = False
 
     @staticmethod
-    def make_profile(name="brewpiv2"):
+    def make_profile(name="brewpi_legacy"):
         """
         Create the brewpiv2 profile
         """
         LOGGER.info("Making BrewPi v2 Profile into database under name '{0}'...".format(name))
-        profile = ControllerProfileManager.create(name, static=True)
+        profile = ControllerProfileManager.create(name)
 
         beer2_sensor = TemperatureSensor(profile=profile,
+                                         is_static=True,
                                          object_id=49,
                                          name="beer2")
 
         db_session.add(beer2_sensor)
 
         beer2_setpoint = SetpointSimple(profile=profile,
+                                        is_static=True,
                                         object_id=51,
                                         name="beer2set")
         db_session.add(beer2_setpoint)
 
         beer2_setpoint_pair = SensorSetpointPair(profile=profile,
                                                  setpoint=beer2_setpoint,
+                                                 is_static=True,
                                                  # sensor=beer2_sensor,
                                                  object_id=50) # not required since static
 
@@ -101,6 +135,7 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
         heater2_pid = PID(profile=profile,
                           name="heater2pid",
                           object_id=52,
+                          is_static=True,
                           input=beer2_setpoint_pair)
                           # output=heater2_pwm)
 
@@ -116,31 +151,41 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
         print("STOPPPEED")
         self.shutdown = True
 
-    @handler("started")
-    def started(self, *args):
+    @handler("init")
+    def init(self, *args):
         # Make sure we have our profile
-        profile_name = "brewpiv2"
+        profile_name = "brewpi_legacy"
         try:
             self.profile = ControllerProfileManager.get(profile_name)
         except NoResultFound:
             self.profile = self.make_profile(name=profile_name)
 
+        # wifi_ctrl = BrewPiController("socket://192.168.0.46:6666")
+        # self.manager.controllers[wifi_ctrl.serial_port] = wifi_ctrl
+        # controller_observer = BrewPiLegacyControllerObserver(wifi_ctrl,
+        #                                                      self.profile,
+        #                                                      self._controller_state_manager).register(self)
+        # wifi_ctrl.subscribe(controller_observer)
+        # wifi_ctrl.connect()
 
-        wifi_ctrl = BrewPiController("socket://192.168.1.6:6666")
-        self.manager.controllers[wifi_ctrl.serial_port] = wifi_ctrl
-        controller_observer = BrewPiLegacyControllerObserver(wifi_ctrl,
-                                                             self.profile,
-                                                             self._controller_state_manager).register(self)
-        wifi_ctrl.subscribe(controller_observer)
-        wifi_ctrl.connect()
+        # Remove all available devices
 
+    @handler("started")
+    def started(self, *args):
         last_update = datetime.now()
 
         while not self.shutdown:
-            while (datetime.now() - last_update) < timedelta(seconds=2):
-                yield
+            if (datetime.now() - last_update) > timedelta(seconds=5):
+                LOGGER.debug("Requesting controller update from backend {0}".format(self))
 
-            LOGGER.debug("Requesting update from backend {0}".format(self))
+                # Request list of available devices with values
+                for port, controller in self.manager.controllers.items():
+                    if controller.is_connected:
+                        controller.send(ListAvailableDevicesCommand(with_values=True))
+
+                last_update = datetime.now()
+
+
             # Update manager
             for new_controller in self.manager.update():
                 controller_observer = BrewPiLegacyControllerObserver(new_controller,
@@ -153,19 +198,11 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
             # Process messages from controllers
             for port, controller in self.manager.controllers.items():
                 if controller.is_connected:
-
-                    # Request list of available devices with values
-                    controller.send(ListAvailableDevicesCommand(with_values=True))
-
                     for raw_message in controller.process_messages():
                         for msg in self.msg_decoder.decode_controller_message(raw_message):
                             controller.notify(message_received, msg)
 
-                            # LOGGER.debug(msg)
-
-            last_update = datetime.now()
-
-
+            yield
 
     def __str__(self):
         return "BrewPi Legacy Backend"
@@ -179,6 +216,8 @@ class SyncherMessageHandler(MessageHandler):
         self.updated_blocks = []
         self.controller_profile = aControllerProfile
 
+        self.available_device_pool = AvailableDevicePool()
+
     def clear_updates(self):
         """
         Once updates have been treated, clear them for next update
@@ -190,11 +229,22 @@ class SyncherMessageHandler(MessageHandler):
 
     def available_device(self, aDevice):
         if aDevice.hardware_type == HardwareType.DIGITAL_PIN:
-            self.updated_blocks.append(DigitalPin(profile=self.controller_profile,
+            self.updated_blocks.append(DigitalPin(object_id=self.available_device_pool.get_id_for(aDevice),
+                                                  profile=self.controller_profile,
                                                   profile_id=self.controller_profile.id,
                                                   name="Digital Pin {0}".format(aDevice.pin),
                                                   pin_number=aDevice.pin,
                                                   is_inverted=aDevice.pin_inverted))
+
+        elif aDevice.hardware_type == HardwareType.TEMP_SENSOR:
+            self.updated_blocks.append(TemperatureSensor(object_id=self.available_device_pool.get_id_for(aDevice),
+                                                         profile=self.controller_profile,
+                                                         profile_id=self.controller_profile.id,
+                                                         value=aDevice.value,
+                                                         name="1-Wire Temperature Sensor@{0}".format(aDevice.address)))
+        else:
+            LOGGER.debug("Unknown device to synch: {0}".format(aDevice))
+
 
     def uninstalled_device(self, anUninstalledDeviceMessage):
         LOGGER.warn("TBI: update uninstalled device!")
@@ -270,20 +320,18 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
 
         self.fire(ControllerConnected(controller))
 
-        time.sleep(2)
-
         self.controller_state = self.controller_state_manager.get_for_controller(self.controller)
 
         # If we get a change from the service/user
-        heater2pid = PID.query.filter(PID.profile==self.profile,
-                                      PID.name=="heater2pid").one()
+        # heater2pid = PID.query.filter(PID.profile==self.profile,
+        #                               PID.name=="heater2pid").one()
 
-        heater2pid.kp = 20
+        # heater2pid.kp = 20
 
-        transaction = self.controller_state.begin_transaction()
-        transaction.add(heater2pid)
-        self.controller_state.commit(self.controller,
-                                     transaction) # fire message
+        # transaction = self.controller_state.begin_transaction()
+        # transaction.add(heater2pid)
+        # self.controller_state.commit(self.controller,
+        #                              transaction) # fire message
 
     def _on_controller_disconnected(self, aBrewPiController):
-        self.fire(ControllerDisconncted(Controller(uri=self._make_controller_uri(aBrewPiController))))
+        self.fire(ControllerDisconnected(self.controller))

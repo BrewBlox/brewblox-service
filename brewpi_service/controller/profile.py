@@ -16,8 +16,8 @@ class ControllerProfileManager:
     def exists(self, name):
         return db_session.query(ControllerProfile).filter(exists().where(ControllerProfile.name==name)).first()
 
-    def create(self, name, static=False):
-        new_profile = ControllerProfile(name=name, is_static=static)
+    def create(self, name):
+        new_profile = ControllerProfile(name=name)
         db_session.add(new_profile)
         db_session.commit()
         LOGGER.debug("Created new profile {0}".format(name))

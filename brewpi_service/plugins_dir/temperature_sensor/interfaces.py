@@ -15,11 +15,11 @@ class ISensorSetpointPair(Interface):
     sensor = Attribute("""The sensor object""")
 
 
-class ISetPoint(Interface):
+class ISetpoint(Interface):
     """
     A Setpoint for a PID
     """
-    setpoint_value = Attribute("""Actual value of the setpoint""")
+    value = Attribute("""Actual value of the setpoint""")
 
 
 class IPID(Interface):

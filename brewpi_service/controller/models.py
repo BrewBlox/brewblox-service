@@ -70,12 +70,18 @@ class ControllerBlock(BaseObject):
         return dirty_fields
 
 
+    def get_actual_value_of_field(self, field_name):
+        if name in self.__class__._controller_data_fields:
+            attribute = getattr(self, name)
+            attribute.request_value(value)
+
+
     is_static = Column(Boolean, default=False, nullable=False, doc="whether the object is hardcoded on the controller or user-creatable")
 
     profile_id = Column(Integer, ForeignKey('controller_profile.id'), nullable=True)
     profile = relationship("models.ControllerProfile")
 
-    object_id = Column(Integer, nullable=True)
+    object_id = Column(Integer, nullable=False)
     name = Column(String, nullable=True)
 
     __table_args__ = (
@@ -110,12 +116,13 @@ class ControllerProfile(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(64), index=True, unique=True)
-    is_static = Column(Boolean)
 
     controllers = relationship("Controller", back_populates="profile")
+
+    blocks = relationship("ControllerBlock", back_populates="profile")
 
     def get_block_by_name(self, name):
         return ControllerBlock.query.with_polymorphic('*').filter(ControllerBlock.name==name).one()
 
     def __repr__(self):
-        return "{0}[{1}]".format(self.name, 'S' if self.is_static else 'D')
+        return self.name

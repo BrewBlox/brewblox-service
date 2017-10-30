@@ -12,7 +12,7 @@ from brewpi_service import app
 
 LOGGER = logging.getLogger(__name__)
 
-engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'], convert_unicode=True)
+engine = create_engine(app.config['DATABASE_URI'], convert_unicode=True)
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=engine))

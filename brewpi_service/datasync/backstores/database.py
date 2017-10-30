@@ -45,12 +45,22 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
 
         if created is False:
             LOGGER.debug("Controller has reconnected: {0}".format(controller))
+            controller.connected = True
+
+            self._clean_old_available_blocks_for(controller.profile, self.session)
+
         else:
             LOGGER.debug("New Controller connected: {0}".format(controller))
 
-        controller.connected = True
 
         self.session.commit()
+
+    def _clean_old_available_blocks_for(self, aControllerProfile, aDBSession):
+        """
+        Remove all stale available blocks
+        """
+        aDBSession.query(ControllerBlock).filter(ControllerBlock.profile_id==aControllerProfile.id,
+                                                 ControllerBlock.object_id<0).delete(synchronize_session=False)
 
 
     @handler("ControllerDisconnected")
@@ -62,6 +72,8 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
         controller.connected = False
 
         db_session.commit()
+
+        self._clean_old_available_blocks_for(controller.profile, db_session)
 
 
     @handler("ControllerBlockList")

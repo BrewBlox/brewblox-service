@@ -23,10 +23,12 @@ class TemperatureSensorPlugin(BrewPiServicePlugin):
         from . import admin
 
         # REST Api
-        from .rest import TemperatureSensor, PID
-        from .schemas import TemperatureSensorSchema, PIDSchema
+        from .models import TemperatureSensor, PID, SetpointSimple, SensorSetpointPair
+        from .schemas import TemperatureSensorSchema, PIDSchema, SetpointSimpleSchema, SensorSetpointPairSchema
         from brewpi_service.controller.schemas import ControllerBlockDisambiguator
 
+        ControllerBlockDisambiguator.class_to_schema[SensorSetpointPair.__name__] = SensorSetpointPairSchema
         ControllerBlockDisambiguator.class_to_schema[TemperatureSensor.__name__] = TemperatureSensorSchema
         ControllerBlockDisambiguator.class_to_schema[PID.__name__] = PIDSchema
+        ControllerBlockDisambiguator.class_to_schema[SetpointSimple.__name__] = SetpointSimpleSchema
 
