@@ -1,12 +1,16 @@
+from werkzeug.exceptions import NotFound
+
 from flask_apispec import MethodResource
 from flask_apispec import marshal_with
 
 from brewpi_service.rest import api_v1
+from brewpi_service.datasync.backends.cache import available_blocks_cache
 
 from .models import Controller, ControllerBlock, ControllerProfile
 from .schemas import (
     ControllerSchema,
     ControllerBlockSchema,
+    ControllerAvailableBlockSchema,
     ControllerProfileSchema
 )
 
@@ -25,6 +29,20 @@ class ControllerDetail(MethodResource):
         return Controller.query.get(id)
 
 api_v1.register('/controllers/<id>/', ControllerDetail)
+
+
+@marshal_with(ControllerAvailableBlockSchema(many=True))
+class ControllerAvailableBlockList(MethodResource):
+    """
+    Available Blocks from the Controller
+    """
+    def get(self, controller_id):
+        controller = Controller.query.get(controller_id)
+        if controller is None:
+            raise NotFound()
+        return available_blocks_cache.get_all_for(controller)
+
+api_v1.register('/controllers/<controller_id>/available_blocks/', ControllerAvailableBlockList)
 
 
 @marshal_with(ControllerProfileSchema)

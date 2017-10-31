@@ -59,7 +59,7 @@ class SensorSetpointPair(ControllerBlock):
 
     # sensor_setpoint_pair_id = Column(Integer, ForeignKey('controller_block.id'), primary_key=True)
 
-    setpoint_id = Column(Integer, ForeignKey('controller_block.id', ondelete='CASCADE'))
+    setpoint_id = Column(Integer, ForeignKey('controller_block.id'), nullable=True)
     setpoint = relationship("ControllerBlock", primaryjoin="and_(SensorSetpointPair.setpoint_id==ControllerBlock.id)", backref="setpoint_setpoint_pair")
 
     # sensor_id = Column(Integer, ForeignKey('controller_block.id'))

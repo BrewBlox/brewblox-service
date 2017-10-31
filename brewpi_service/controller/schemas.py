@@ -49,3 +49,15 @@ class ControllerBlockSchema(ma.ModelSchema):
 
     type = ma.Function(lambda obj: obj.__class__.__name__)
     url = ma.AbsoluteUrlFor('controllerblockdetail', id='<id>')
+
+
+class ControllerAvailableBlockSchema(ma.ModelSchema):
+    """
+    Available Blocks (not installed) living on a Controller
+    """
+    class Meta:
+        model = ControllerBlock
+        fields = ('type', 'object_id', 'name', 'last_seen')
+
+    type = ma.Function(lambda obj: obj.__class__.__name__)
+    last_seen = ma.Field(attribute='updated_at')

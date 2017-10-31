@@ -47,8 +47,11 @@ from brewpi_service.plugins_dir.temperature_sensor.models import TemperatureSens
 
 from ..abstract import AbstractControllerSyncherBackend
 
+from .cache import available_blocks_cache
+
 
 LOGGER = logging.getLogger(__name__)
+
 
 class AvailableDevicePool:
     """
@@ -102,7 +105,7 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
         """
         Create the brewpiv2 profile
         """
-        LOGGER.info("Making BrewPi v2 Profile into database under name '{0}'...".format(name))
+        LOGGER.info("Making BrewPi Legacy Profile into database under name '{0}'...".format(name))
         profile = ControllerProfileManager.create(name)
 
         beer2_setpoint = SetpointSimple(profile=profile,
@@ -215,9 +218,10 @@ class SyncherMessageHandler(MessageHandler):
     """
     Take actions upon Controller Message reception
     """
-    def __init__(self, aControllerProfile):
+    def __init__(self, aController, aControllerProfile):
         self.updated_blocks = []
         self.controller_profile = aControllerProfile
+        self.controller = aController
 
         self.available_device_pool = AvailableDevicePool()
 
@@ -232,18 +236,15 @@ class SyncherMessageHandler(MessageHandler):
 
     def available_device(self, aDevice):
         if aDevice.hardware_type == HardwareType.DIGITAL_PIN:
-            self.updated_blocks.append(DigitalPin(object_id=self.available_device_pool.get_id_for(aDevice),
-                                                  profile=self.controller_profile,
-                                                  profile_id=self.controller_profile.id,
+            available_blocks_cache.add(self.controller,
+                                       DigitalPin(object_id=self.available_device_pool.get_id_for(aDevice),
                                                   name="Digital Pin {0}".format(aDevice.pin),
                                                   pin_number=aDevice.pin,
                                                   is_inverted=aDevice.pin_inverted))
 
         elif aDevice.hardware_type == HardwareType.TEMP_SENSOR:
-            print(aDevice.value)
-            self.updated_blocks.append(TemperatureSensor(object_id=self.available_device_pool.get_id_for(aDevice),
-                                                         profile=self.controller_profile,
-                                                         profile_id=self.controller_profile.id,
+            available_blocks_cache.add(self.controller,
+                                       TemperatureSensor(object_id=self.available_device_pool.get_id_for(aDevice),
                                                          value=(aDevice.value, aDevice.value), # Set actual value
                                                          name="1-Wire Temperature Sensor@{0}".format(aDevice.address)))
         else:
@@ -281,7 +282,7 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
         self.controller_state_manager = aControllerStateManager
         self.controller_state = None
 
-        self.msg_handler = SyncherMessageHandler(self.profile)
+        self.msg_handler = None
 
     def _make_controller_uri(self, aBrewPiController):
         """
@@ -306,6 +307,9 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
         self.msg_handler.accept(aMessage)
 
     def dispatch_and_clear_updates(self):
+        if not self.msg_handler:
+            return
+
         if len(self.msg_handler.updated_blocks) > 0:
             self.fire(ControllerBlockList(self.controller, self.msg_handler.updated_blocks))
 
@@ -325,6 +329,9 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
 
         self.controller_state = self.controller_state_manager.get_for_controller(self.controller)
 
+        # Create a message handler for this controller
+        self.msg_handler = SyncherMessageHandler(self.controller, self.profile)
+
         # If we get a change from the service/user
         # heater2pid = PID.query.filter(PID.profile==self.profile,
         #                               PID.name=="heater2pid").one()
@@ -337,7 +344,11 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
         #                              transaction) # fire message
 
     def _on_controller_disconnected(self, aBrewPiController):
+        """
+        Callback when a controller has been disconnected
+        """
         self.fire(ControllerDisconnected(self.controller))
 
     def cleanup(self, limit_time):
+        available_blocks_cache.cleanup_stale_blocks_for(self.controller)
         self.fire(ControllerCleanStaleAvailableBlocks(self.controller, limit_time))

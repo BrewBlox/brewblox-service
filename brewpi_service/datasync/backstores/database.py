@@ -90,7 +90,7 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
         self._clean_stale_available_blocks_for(controller.profile, event.time_limit, db_session)
         db_session.flush()
 
-    @handler("ControllerBlockList")
+    # @handler("ControllerBlockList") ## Disabled while working on available blocks
     def on_controller_block_list(self, event):
         LOGGER.debug("Synching {0} blocks from controller {1}".format(len(event.blocks), event.controller))
 
