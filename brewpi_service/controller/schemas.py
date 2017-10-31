@@ -27,9 +27,10 @@ def controller_block_schema_serialization_disambiguation(base_object, parent_obj
 class ControllerSchema(ma.ModelSchema):
     class Meta:
         model = Controller
-        fields = ('id', 'connected', 'profile', 'name', 'description', 'uri')
+        fields = ('id', 'connected', 'profile', 'available_blocks', 'name', 'description', 'uri')
 
     profile = ma.HyperlinkRelated('controllerprofiledetail')
+    available_blocks = ma.AbsoluteUrlFor('controlleravailableblocklist', controller_id='<id>')
 
 
 class ControllerProfileSchema(ma.ModelSchema):
@@ -45,7 +46,7 @@ class ControllerProfileSchema(ma.ModelSchema):
 class ControllerBlockSchema(ma.ModelSchema):
     class Meta:
         model = ControllerBlock
-        fields = ('type', 'is_static', 'object_id', 'name', 'url')
+        fields = ('type', 'updated_at', 'is_static', 'object_id', 'name', 'url')
 
     type = ma.Function(lambda obj: obj.__class__.__name__)
     url = ma.AbsoluteUrlFor('controllerblockdetail', id='<id>')

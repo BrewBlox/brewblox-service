@@ -179,6 +179,7 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
                 for port, controller in self.manager.controllers.items():
                     if controller.is_connected:
                         controller.send(ListAvailableDevicesCommand(with_values=True))
+                        controller.send(ListInstalledDevicesCommand(with_values=True))
 
                 # Clean up every cycle
                 for observer in self.controller_observers:
@@ -231,8 +232,15 @@ class SyncherMessageHandler(MessageHandler):
         """
         self.updated_blocks = []
 
-    def installed_device(self, anInstalledDeviceMessage):
-        LOGGER.warn("TBI: update installed device!")
+    def installed_device(self, aDevice):
+        if aDevice.hardware_type == HardwareType.TEMP_SENSOR:
+            self.updated_blocks.append(TemperatureSensor(object_id=aDevice.slot,
+                                                         profile=self.controller_profile,
+                                                         profile_id=self.controller_profile.id,
+                                                         name="1-Wire Temperature Sensor@{0}".format(aDevice.address),
+                                                         value=(aDevice.value, aDevice.value)))
+        else:
+            LOGGER.warn("Unknown installed device, ignoring.")
 
     def available_device(self, aDevice):
         if aDevice.hardware_type == HardwareType.DIGITAL_PIN:
@@ -350,5 +358,6 @@ class BrewPiLegacyControllerObserver(Component, ControllerObserver):
         self.fire(ControllerDisconnected(self.controller))
 
     def cleanup(self, limit_time):
-        available_blocks_cache.cleanup_stale_blocks_for(self.controller)
-        self.fire(ControllerCleanStaleAvailableBlocks(self.controller, limit_time))
+        if self.controller:
+            available_blocks_cache.cleanup_stale_blocks_for(self.controller)
+            self.fire(ControllerCleanStaleAvailableBlocks(self.controller, limit_time))

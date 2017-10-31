@@ -64,8 +64,10 @@ class PIDSchema(ControllerBlockSchema):
     """
     class Meta:
         model = PID
-        fields = ControllerBlockSchema.Meta.fields + ('input', 'actuator', 'setpoint', 'url')
+        fields = ControllerBlockSchema.Meta.fields + ('url', 'kp')
 
-    actuator = ma.HyperlinkRelated('controllerblockdetail')
-    setpoint = ma.HyperlinkRelated('controllerblockdetail')
-    input = ma.HyperlinkRelated('controllerblockdetail')
+    kp = ControllerData(attribute='kp')
+
+    # actuator = ma.AbsoluteUrlFor('controllerblockdetail', id='<actuator_id>')
+    # setpoint = ma.HyperlinkRelated('controllerblockdetail')
+    # input = ma.HyperlinkRelated('controllerblockdetail')

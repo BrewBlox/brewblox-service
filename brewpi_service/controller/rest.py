@@ -50,7 +50,7 @@ class ControllerProfileDetail(MethodResource):
     def get(self, id):
         return ControllerProfile.query.get(id)
 
-api_v1.register('/controllers/profiles/<id>/', ControllerProfileDetail)
+api_v1.register('/controller_profiles/<id>/', ControllerProfileDetail)
 
 
 @marshal_with(ControllerBlockSchema(many=True))
@@ -58,7 +58,7 @@ class ControllerBlockList(MethodResource):
     def get(self):
         return ControllerBlock.query.all()
 
-api_v1.register('/controllers/blocks/', ControllerBlockList)
+api_v1.register('/controller_blocks/', ControllerBlockList)
 
 
 @marshal_with(ControllerBlockSchema)
@@ -66,4 +66,4 @@ class ControllerBlockDetail(MethodResource):
     def get(self, id):
         return ControllerBlock.query.get(id)
 
-api_v1.register('/controllers/blocks/<id>/', ControllerBlockDetail)
+api_v1.register('/controller_blocks/<id>/', ControllerBlockDetail)

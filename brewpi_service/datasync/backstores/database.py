@@ -60,14 +60,14 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
         Remove all available blocks
         """
         aDBSession.query(ControllerBlock).filter(ControllerBlock.profile_id==aControllerProfile.id,
-                                                 ControllerBlock.object_id<0).delete(synchronize_session=False)
+                                                 ControllerBlock.is_static==False).delete(synchronize_session=False)
 
     def _clean_stale_available_blocks_for(self, aControllerProfile, time_limit, aDBSession):
         """
         Remove all stale available blocks (not updated since a few seconds)
         """
         aDBSession.query(ControllerBlock).filter(ControllerBlock.profile_id==aControllerProfile.id,
-                                                 ControllerBlock.object_id<0,
+                                                 ControllerBlock.is_static==False,
                                                  ControllerBlock.updated_at<=time_limit).delete(synchronize_session=False)
 
     @handler("ControllerDisconnected")
@@ -90,7 +90,7 @@ class DatabaseSyncher(Component, AbstractBackstoreSyncher):
         self._clean_stale_available_blocks_for(controller.profile, event.time_limit, db_session)
         db_session.flush()
 
-    # @handler("ControllerBlockList") ## Disabled while working on available blocks
+    @handler("ControllerBlockList") ## Disabled while working on available blocks
     def on_controller_block_list(self, event):
         LOGGER.debug("Synching {0} blocks from controller {1}".format(len(event.blocks), event.controller))
 
