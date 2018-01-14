@@ -43,9 +43,15 @@ class BlockState(defaultdict):
     def __init__(self):
         super(BlockState, self).__init__(lambda: [None, None])
 
+
 class ControllerState(Component):
+    """
+    The simplest, most universal way of representing a controller state: a
+    dictionary of block IDs themselfves composed of dictionaries of attributes.
+    Example:
+      - {BLOCK_ID: {ATTR_NAME: (CURRENT_VALUE, REQUESTED_VALUE)}}
+    """
     def __init__(self, aControllerStateManager):
-        # {BLOCK_ID: {ATTR_NAME: (ACTUAL_VALUE, REQUESTED_VALUE)}}
         self.states = defaultdict(BlockState)
 
         self._controller_state_manager = aControllerStateManager
@@ -65,7 +71,6 @@ class ControllerState(Component):
 
     def get_actual(self, aBlock, attribute_name):
         return self.get(aBlock, attribute_name)[0]
-
 
     def begin_transaction(self):
         return ControllerStateTransaction()
@@ -104,6 +109,10 @@ class ControllerStateTransaction:
         return changes
 
 class ControllerStateManager(Component):
+    """
+    The manager holding states for every Controller registered
+    Shoud be seen as a Singleton
+    """
     def __init__(self):
         self.states = defaultdict(lambda: ControllerState(self))
         super(ControllerStateManager, self).__init__()

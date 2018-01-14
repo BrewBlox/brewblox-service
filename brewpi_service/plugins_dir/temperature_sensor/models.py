@@ -119,11 +119,11 @@ class PID(ControllerBlock):
                                             remote_side="ControllerBlock.id"))
 
     input_id = Column(Integer, ForeignKey(ControllerBlock.id), nullable=True)
-    input = relationship('ControllerBlock',
-                         foreign_keys=[input_id],
-                         primaryjoin="ControllerBlock.id == PID.input_id",
-                         backref=backref('pid_inputs',
-                                         remote_side="ControllerBlock.id"))
+    input = ControllerDataField(relationship('ControllerBlock',
+                                             foreign_keys=[input_id],
+                                             primaryjoin="ControllerBlock.id == PID.input_id",
+                                             backref=backref('pid_inputs',
+                                                             remote_side="ControllerBlock.id")), writable=True)
 
     kp = ControllerDataField(Float, writable=True)
 

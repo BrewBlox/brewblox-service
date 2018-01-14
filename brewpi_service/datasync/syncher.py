@@ -26,8 +26,8 @@ class DataSyncherServer(Component):
 
         self._backstores = (DatabaseSyncher().register(self))
         self._forwarders = (SSEForwarder().register(self))
-        # self._backends = (VirtualBrewPiSyncherBackend(self._state_manager).register(self))
-        self._backends = (BrewPiLegacySyncherBackend(self._state_manager).register(self))
+        self._backends = (VirtualBrewPiSyncherBackend(self._state_manager).register(self))
+        # self._backends = (BrewPiLegacySyncherBackend(self._state_manager).register(self))
 
 
     @handler("started")

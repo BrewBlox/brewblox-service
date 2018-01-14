@@ -108,17 +108,34 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
         LOGGER.info("Making BrewPi Legacy Profile into database under name '{0}'...".format(name))
         profile = ControllerProfileManager.create(name)
 
-        beer2_setpoint = SetpointSimple(profile=profile,
+        beer1_setpoint = SetpointSimple(profile=profile,
                                         is_static=True,
                                         object_id=51,
+                                        name="beer1set")
+        db_session.add(beer1_setpoint)
+
+        beer1_setpoint_pair = SensorSetpointPair(profile=profile,
+                                                 name="heater1sensorsetpointpair",
+                                                 setpoint=beer1_setpoint,
+                                                 is_static=True,
+                                                 # sensor=beer2_sensor,
+                                                 object_id=61) # not required since static
+
+        db_session.add(beer1_setpoint_pair)
+
+
+        beer2_setpoint = SetpointSimple(profile=profile,
+                                        is_static=True,
+                                        object_id=52,
                                         name="beer2set")
         db_session.add(beer2_setpoint)
 
         beer2_setpoint_pair = SensorSetpointPair(profile=profile,
+                                                 name="heater2sensorsetpointpair",
                                                  setpoint=beer2_setpoint,
                                                  is_static=True,
                                                  # sensor=beer2_sensor,
-                                                 object_id=50) # not required since static
+                                                 object_id=62) # not required since static
 
         db_session.add(beer2_setpoint_pair)
 
@@ -129,13 +146,22 @@ class BrewPiLegacySyncherBackend(Component, AbstractControllerSyncherBackend):
 
         # db_session.add(heater2_pwm)
 
+        heater1_pid = PID(profile=profile,
+                          name="heater1pid",
+                          object_id=71,
+                          is_static=True,
+                          input=beer1_setpoint_pair)
+                          # output=heater2_pwm)
+
+
         heater2_pid = PID(profile=profile,
                           name="heater2pid",
-                          object_id=52,
+                          object_id=72,
                           is_static=True,
                           input=beer2_setpoint_pair)
                           # output=heater2_pwm)
 
+        db_session.add(heater1_pid)
         db_session.add(heater2_pid)
 
         db_session.commit()

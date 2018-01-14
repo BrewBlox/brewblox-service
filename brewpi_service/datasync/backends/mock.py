@@ -1,4 +1,5 @@
 import logging
+from itertools import groupby
 import time
 
 
@@ -93,16 +94,40 @@ class VirtualBrewPiSyncherBackend(Component, AbstractControllerSyncherBackend):
             self.controller_state.commit(self.controller,
                                          transaction) # fire message
 
+
+            # Try to link a new sensor to heater2
+            heater2pid = PID.query.filter(PID.name=="heater2pid").one()
+            heater2pid.input = TemperatureSensor(object_id=99)
+
+            transaction = self.controller_state.begin_transaction()
+            transaction.add(heater2pid)
+            self.controller_state.commit(self.controller,
+                                         transaction) # fire message
+
             self.shutdown = True
             time.sleep(1)
 
     @handler("ControllerStateChangeRequest")
     def on_controller_state_change_request(self, event):
-        for change in event.changes:
-            (block, fieldname, requested_value) = change
-            if type(block) == PID:
-                ## SPECIFIC
-                print("do something on the controller with {0} {1} {2}".format(block, fieldname, requested_value))
+        for block in groupby(event.changes, key=lambda x: x[0]):
+
+            control_changes = {}
+            for change in block[1]:
+                (block, fieldname, requested_value) = change
+                if type(block) == PID:
+                    ## SPECIFIC
+                    if fieldname in ('input', ): # We have a link change
+                        print("update link '{1}' on block {0} with object {2}".format(block, fieldname, requested_value))
+                        if block.name in ('heater1pid', 'cooler1pid'):
+                            InstallDeviceCommand(0, DeviceAssignation.CHAMBER, DeviceFunction.CHAMBER_TEMP, HardwareType.TEMP_SENSOR)
+                        elif block.name == 'beer2fridgepid':
+                            InstallDeviceCommand(0, DeviceAssignation.BEER, DeviceFunction.BEER_TEMP, HardwareType.TEMP_SENSOR)
+                    elif fieldname in ('kp',):
+                        print("collecting new data for {0} {1} {2}".format(block, fieldname, requested_value))
+                        control_changes[fieldname] = requested_value
+            if len(control_changes) > 0:
+                print("sending control settings...")
+                ControlSettingsCommand(heater1_kp=control_changes['kp'])
 
     def on_receive_control_settings(self, control_settings):
         """

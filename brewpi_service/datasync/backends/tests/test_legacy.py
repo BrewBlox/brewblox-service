@@ -1,4 +1,4 @@
-from mock import Mock
+from unittest.mock import Mock
 
 from brewpi_service.datasync.backends.brewpi_legacy import AvailableDevicePool
 
