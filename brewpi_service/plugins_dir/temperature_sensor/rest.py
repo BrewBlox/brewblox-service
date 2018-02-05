@@ -1,50 +1,57 @@
 from flask import jsonify
 
-from brewpi_service import app
-
-from .models import TemperatureSensorDevice, PID
-from .schemas import (
-    temperature_sensor_schema,
-    temperature_sensors_schema,
-    pid_loop_schema,
-    pid_loops_schema
+from brewpi_service.rest import (
+    api_v1,
+    marshal_with, MethodResource
 )
 
+from .models import TemperatureSensor, PID
+from .schemas import (
+    TemperatureSensorSchema,
+    PIDSchema,
+)
 
-@app.route('/temperature_sensors/')
-def temperature_sensors():
+# -- Temperature Sensor
+@marshal_with(TemperatureSensorSchema(many=True))
+class TemperatureSensorList(MethodResource):
     """
     List Temperature Sensors
     """
-    all_sensors = TemperatureSensorDevice.query.all()
-    result = temperature_sensors_schema.dump(all_sensors)
-    return jsonify(result.data)
+    def get(self, **kwargs):
+        return TemperatureSensor.query.all()
+
+api_v1.register('/temperature_sensors/', TemperatureSensorList)
 
 
-@app.route('/temperature_sensors/<id>')
-def temperature_sensor_detail(id):
+@marshal_with(TemperatureSensorSchema)
+class TemperatureSensorDetail(MethodResource):
     """
-    Detail a given Temperature Sensor Device
+    Detail a given Temperature Sensor
     """
-    temperature_sensor = TemperatureSensorDevice.query.get(id)
-    return temperature_sensor_schema.jsonify(temperature_sensor)
+    def get(self, id, **kwargs):
+        return TemperatureSensor.query.get(id)
+
+api_v1.register('/temperature_sensors/<id>/', TemperatureSensorDetail)
 
 
 # -- PID
-@app.route('/pids/')
-def pid_loops():
+@marshal_with(PIDSchema(many=True))
+class PIDList(MethodResource):
     """
     List PIDs
     """
-    all_pids = PID.query.all()
-    result = pid_loops_schema.dump(all_pids)
-    return jsonify(result.data)
+    def get(self, **kwargs):
+        return PID.query.all()
+
+api_v1.register('/pids/', PIDList)
 
 
-@app.route('/pids/<id>')
-def pid_loop_detail(id):
+@marshal_with(PIDSchema)
+class PIDDetail(MethodResource):
     """
     Detail a given PID
     """
-    pid_loop = PID.query.get(id)
-    return pid_loop_schema.jsonify(pid_loop)
+    def get(self, id, **kwargs):
+        return PID.query.get(id)
+
+api_v1.register('/pids/<id>/', PIDDetail)

@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import create_engine, Column
 from sqlalchemy.orm import scoped_session, sessionmaker, mapper, composite
 from sqlalchemy.orm.exc import NoResultFound
@@ -8,8 +10,9 @@ from flask_plugins import emit_event
 
 from brewpi_service import app
 
+LOGGER = logging.getLogger(__name__)
 
-engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'], convert_unicode=True)
+engine = create_engine(app.config['DATABASE_URI'], convert_unicode=True)
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=engine))
@@ -19,17 +22,7 @@ db_session = scoped_session(sessionmaker(autocommit=False,
 def shutdown_session(exception=None):
     db_session.remove()
 
-
-class ControllerData(object):
-    def __init__(self, *args, **kwargs):
-        self._writable = False
-
-        if 'writable' in kwargs:
-            self._writable = True
-            kwargs.pop('writable')
-
-        self._args = args
-        self._kwargs = kwargs
+from collections import UserList
 
 
 class ControllerCompositeColumn(object):
@@ -40,35 +33,17 @@ class ControllerCompositeColumn(object):
     def __composite_values__(self):
         return self.actual_column, self.requested_column
 
-
+from brewpi_service.controller.state import ControllerDataField
 class BaseClsMeta(DeclarativeMeta):
     def __init__(cls, classname, bases, dict_):
+        cls._controller_data_fields = []
 
-        new_fields = {}
-        for name, attribute in dict_.items():
-            if type(attribute) is ControllerData:
-                if attribute._writable:
-                    requested_colname = "_{0}_requested".format(name)
-                    requested_column = Column(requested_colname, *attribute._args, nullable=True, **attribute._kwargs)
-                    new_fields[requested_colname] = requested_column
+        for name, attribute in cls.__dict__.items():
+            if type(attribute) is ControllerDataField:
+                LOGGER.debug("Marking attribute '{0}' as controller state".format(name))
+                cls._controller_data_fields.append(name)
 
-                    actual_colname = "_{0}".format(name)
-                    actual_column = Column(actual_colname, *attribute._args, nullable=True, **attribute._kwargs)
-                    new_fields[actual_colname] = actual_column
-
-                    composite_colname = "{0}".format(name)
-                    new_fields[composite_colname] = composite(ControllerCompositeColumn,
-                                                              actual_column,
-                                                              requested_column)
-                else:
-                    new_fields[name] = Column(name, *attribute._args, **attribute._kwargs)
-
-        # Set new fields
-        dict_.update(new_fields)
-        for new_field_name, new_field in new_fields.items():
-            setattr(cls, new_field_name, dict_[new_field_name])
-
-        super(BaseClsMeta, cls).__init__(classname, bases, dict_)
+        return super(BaseClsMeta, cls).__init__(classname, bases, dict_)
 
 
 Base = declarative_base(metaclass=BaseClsMeta, mapper=mapper)
@@ -106,6 +81,7 @@ def get_or_create(session,
             session.add(created)
             session.commit()
             return created, True
-        except IntegrityError:
+        except IntegrityError as e:
             session.rollback()
+            LOGGER.error(e)
             return session.query(model).filter_by(**kwargs).one(), True

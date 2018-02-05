@@ -1,28 +1,30 @@
-from flask import jsonify
-
-from brewpi_service import app
-
-from .models import ClockDevice
-from .schemas import (
-    clock_schema,
-    clocks_schema
+from brewpi_service.rest import (
+    marshal_with,
+    MethodResource,
+    api_v1
 )
 
-
-@app.route('/clocks/')
-def clocks():
-    """
-    List Clock Devices
-    """
-    all_clocks = ClockDevice.query.all()
-    result = clocks_schema.dump(all_clocks)
-    return jsonify(result.data)
+from .models import ClockDevice
+from .schemas import ClockSchema
 
 
-@app.route('/clocks/<id>')
-def clock_detail(id):
+@marshal_with(ClockSchema(many=True))
+class ClockList(MethodResource):
     """
-    Detail a given Clock Device
+    List Clocks
     """
-    clock = ClockDevice.query.get(id)
-    return clock_schema.jsonify(clock)
+    def get(self, **kwargs):
+        return ClockDevice.query.all()
+
+api_v1.register('/clocks/', ClockList)
+
+
+@marshal_with(ClockSchema)
+class ClockDetail(MethodResource):
+    """
+    Detail a given Clock
+    """
+    def get(self, id, **kwargs):
+        return ClockDevice.query.get(id)
+
+api_v1.register('/clocks/<id>/', ClockDetail)

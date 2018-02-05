@@ -2,72 +2,63 @@ from marshmallow_polyfield import PolyField
 
 from brewpi_service import ma
 
-from .models import Controller, ControllerDevice, ControllerLoop
+from .models import (
+    Controller,
+    ControllerBlock,
+    ControllerProfile
+)
 
-
-class ControllerDeviceDisambiguator:
+class ControllerBlockDisambiguator:
     class_to_schema = {
     }
 
 
-def controller_device_schema_serialization_disambiguation(base_object, parent_obj):
+def controller_block_schema_serialization_disambiguation(base_object, parent_obj):
     try:
-        return ControllerDeviceDisambiguator.class_to_schema[base_object.__class__.__name__]()
+        return ControllerBlockDisambiguator.class_to_schema[base_object.__class__.__name__]()
     except KeyError:
         pass
 
     raise TypeError("Could not detect type of {0}. "
                     "Did not have a base or a length. "
-                    "Are you sure this is a Controller Device?".format(base_object.__class__))
-
-
-class ControllerLoopDisambiguator:
-    class_to_schema = {}
-
-
-def controller_loop_schema_serialization_disambiguation(base_object, parent_obj):
-    try:
-        return ControllerLoopDisambiguator.class_to_schema[base_object.__class__.__name__]()
-    except KeyError:
-        pass
-
-    raise TypeError("Could not detect type of {0}. "
-                    "Did not have a base or a length. "
-                    "Are you sure this is a Controller Loop?".format(base_object.__class__))
+                    "Are you sure this is a Controller Block?".format(base_object.__class__))
 
 
 class ControllerSchema(ma.ModelSchema):
     class Meta:
         model = Controller
-        fields = ('id', 'connected', 'name', 'devices', 'loops', 'description', 'uri')
+        fields = ('id', 'connected', 'profile', 'available_blocks', 'name', 'description', 'uri')
 
-    devices = ma.List(PolyField(
-        serialization_schema_selector=controller_device_schema_serialization_disambiguation,
+    profile = ma.HyperlinkRelated('controllerprofiledetail')
+    available_blocks = ma.AbsoluteUrlFor('controlleravailableblocklist', controller_id='<id>')
+
+
+class ControllerProfileSchema(ma.ModelSchema):
+    class Meta:
+        model = ControllerProfile
+        fields = ('name', 'blocks')
+
+    blocks = ma.List(PolyField(
+        serialization_schema_selector=controller_block_schema_serialization_disambiguation,
     ))
 
-    loops = ma.List(PolyField(
-        serialization_schema_selector=controller_loop_schema_serialization_disambiguation,
-    ))
 
-
-class ControllerDeviceSchema(ma.ModelSchema):
+class ControllerBlockSchema(ma.ModelSchema):
     class Meta:
-        model = ControllerDevice
-        fields = ('id', 'object_id')
+        model = ControllerBlock
+        fields = ('type', 'updated_at', 'is_static', 'object_id', 'name', 'url')
+
+    type = ma.Function(lambda obj: obj.__class__.__name__)
+    url = ma.AbsoluteUrlFor('controllerblockdetail', id='<id>')
 
 
-class ControllerLoopSchema(ma.ModelSchema):
+class ControllerAvailableBlockSchema(ma.ModelSchema):
+    """
+    Available Blocks (not installed) living on a Controller
+    """
     class Meta:
-        model = ControllerLoop
-        fields = ('id', 'object_id')
+        model = ControllerBlock
+        fields = ('type', 'object_id', 'name', 'last_seen')
 
-
-# Schema instanciations
-controller_schema = ControllerSchema()
-controllers_schema = ControllerSchema(many=True)
-
-controller_device_schema = ControllerDeviceSchema()
-controller_devices_schema = ControllerDeviceSchema(many=True)
-
-controller_loop_schema = ControllerLoopSchema()
-controller_loops_schema = ControllerLoopSchema(many=True)
+    type = ma.Function(lambda obj: obj.__class__.__name__)
+    last_seen = ma.Field(attribute='updated_at')

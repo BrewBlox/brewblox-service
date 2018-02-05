@@ -7,7 +7,7 @@ from .models import ClockDevice
 class ClockDeviceAdminView(ModelView):
     column_hide_backrefs = False
     column_exclude_list = ('type',)
-    column_filters = ('controller',)
+    # column_filters = ('controller',)
 
 
 admin.add_view(ClockDeviceAdminView(ClockDevice, db_session))

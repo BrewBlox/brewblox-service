@@ -5,7 +5,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, backref
 
 from brewpi_service.database import Base
-from brewpi_service.controller.models import ControllerObject
+from brewpi_service.controller.models import ControllerBlock
 
 
 class LoggedDeviceConfiguration(Base):
@@ -16,11 +16,11 @@ class LoggedDeviceConfiguration(Base):
 
     id = Column(Integer, primary_key=True)
 
-    device_id = Column(Integer, ForeignKey('controller_object.id'), nullable=False)
-    device = relationship(ControllerObject,
-                          backref=backref('logging_configurations',
-                                          uselist=True,
-                                          cascade='delete, all'))
+    block_id = Column(Integer, ForeignKey('controller_block.id'), nullable=False)
+    block = relationship(ControllerBlock,
+                         backref=backref('logging_configurations',
+                                         uselist=True,
+                                         cascade='delete, all'))
 
     device_field = Column(String, nullable=False)
 

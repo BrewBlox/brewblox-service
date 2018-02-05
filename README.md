@@ -5,7 +5,7 @@ For our current production version, see [brewpi-www](https://github.com/BrewPi/b
 
 # Install
 
-Install [Python 3.3+](https://www.python.org/downloads/)
+Install [Python 3.6](https://www.python.org/downloads/)
 
 Create a new virtualenv for brewpi_service. Easiest way to do this is with
 virtualenvwrapper. Install it through pip or your package manager.
@@ -21,7 +21,7 @@ For other systems:
     
 Create a new virtualenv:
 
-    mkvirtualenv brewpiws
+    mkvirtualenv brewpiws -p `which python3.6`
     
 
 Now start using the virtualenv:

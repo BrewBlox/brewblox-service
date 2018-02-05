@@ -1,33 +1,73 @@
+from marshmallow import fields
 from brewpi_service import ma
 
-from .models import TemperatureSensorDevice, PID
+from brewpi_service.controller.schemas import (
+    ControllerBlockSchema,
+)
+
+from brewpi_service.controller.fields import ControllerData
+
+from .models import (
+    TemperatureSensor,
+    PID,
+    SensorSetpointPair,
+    SetpointSimple
+)
+
+from .interfaces import (
+    ISensor,
+    ISetpoint,
+    ISensorSetpointPair,
+    IPID
+)
+
+from zope.interface import implementer
 
 
-class TemperatureSensorDeviceSchema(ma.ModelSchema):
+@implementer(ISetpoint)
+class SetpointSimpleSchema(ControllerBlockSchema):
     """
-    Serialization schema for the TemperatureSensorDevice
+    A Simple setpoint
     """
     class Meta:
-        model = TemperatureSensorDevice
-        fields = ('id', 'value', 'url')
+        model = SetpointSimple
+        fields = ControllerBlockSchema.Meta.fields + ('value',)
 
-    url = ma.AbsoluteUrlFor('temperature_sensor_detail', id='<id>')
+    value = ControllerData(attribute='value')
+
+@implementer(ISensorSetpointPair)
+class SensorSetpointPairSchema(ControllerBlockSchema):
+    """
+    A simple pair of a Sensor and a Setpoint
+    """
+    class Meta:
+        model = SensorSetpointPair
+        fields = ControllerBlockSchema.Meta.fields
 
 
-temperature_sensor_schema = TemperatureSensorDeviceSchema()
-temperature_sensors_schema = TemperatureSensorDeviceSchema(many=True)
+@implementer(ISensor)
+class TemperatureSensorSchema(ControllerBlockSchema):
+    """
+    Serialization schema for the TemperatureSensor
+    """
+    class Meta:
+        model = TemperatureSensor
+        fields = ControllerBlockSchema.Meta.fields + ('value', 'url')
+
+    value = ControllerData(attribute='value')
 
 
-class PIDLoopSchema(ma.ModelSchema):
+@implementer(IPID)
+class PIDSchema(ControllerBlockSchema):
     """
     Serialization schema for the PID Loop algorithm
     """
     class Meta:
         model = PID
-        fields = ('id', 'input', 'actuator', 'setpoint', 'url')
+        fields = ControllerBlockSchema.Meta.fields + ('url', 'kp')
 
-    url = ma.AbsoluteUrlFor('pid_loop_detail', id='<id>')
+    kp = ControllerData(attribute='kp')
 
-
-pid_loop_schema = PIDLoopSchema()
-pid_loops_schema = PIDLoopSchema(many=True)
+    # actuator = ma.AbsoluteUrlFor('controllerblockdetail', id='<actuator_id>')
+    # setpoint = ma.HyperlinkRelated('controllerblockdetail')
+    # input = ma.HyperlinkRelated('controllerblockdetail')
