@@ -3,6 +3,8 @@ from typing import Type
 from flask import Flask
 from flask.views import View
 from flask_apispec import FlaskApiSpec
+from flask_cors import CORS
+from flask_marshmallow import Marshmallow
 
 
 class Api():
@@ -43,3 +45,19 @@ class Api():
             app.add_url_rule(deferred[0], view_func=deferred[1])
             self.specs.register(deferred[1])
         self.specs.init_app(app)
+
+
+def create_app(config: dict) -> Type[Flask]:
+    app = Flask('brewblox_service')
+    app.config.update(config)
+
+    ma = Marshmallow(app)
+    api = Api()
+
+    # TODO(Bob) init all other app components
+
+    CORS(app)
+    api.init_app(app)
+    ma.init_app(app)
+
+    return app
