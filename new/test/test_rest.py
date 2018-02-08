@@ -19,8 +19,22 @@ def test_api(mocker):
 
     specs_mock.register.assert_called_once_with(endpoint_mock)
     specs_mock.init_app.assert_called_once_with(app_mock)
-    app_mock.add_url_rule.assert_called_once_with('/prefix/end/point', view_func=endpoint_mock)
+    app_mock.add_url_rule.assert_called_once_with('prefix/end/point', view_func=endpoint_mock)
 
 
-def test_create_app():
-    assert rest.create_app({})
+def test_create_app(app_config):
+    assert rest.create_app(app_config)
+
+
+def test_shutdown(mocker, app, client):
+    assert client.get('shutdown').status_code == 500
+
+    shutdown_mock = Mock()
+    request_mock = mocker.patch('brewblox_service.rest.request')
+    request_mock.environ.get.return_value = shutdown_mock
+
+    assert client.get('shutdown').status_code == 200
+    assert shutdown_mock.call_count == 1
+
+    assert client.post('shutdown').status_code == 200
+    assert shutdown_mock.call_count == 2
