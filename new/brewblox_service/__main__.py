@@ -10,7 +10,11 @@ import sys
 from logging.handlers import TimedRotatingFileHandler
 from typing import Type
 
-from brewblox_service import rest
+from flask import Flask
+from flask_apispec import FlaskApiSpec
+from flask_cors import CORS
+
+from brewblox_service import rest, plugger
 
 
 def get_args(sys_args: list) -> Type[argparse.Namespace]:
@@ -27,6 +31,9 @@ def get_args(sys_args: list) -> Type[argparse.Namespace]:
     argparser.add_argument('--debug',
                            help='Run the Flask app in debug mode.',
                            action='store_true')
+    argparser.add_argument('--plugindir',
+                           help='Directory from which Flask plugins are loaded. Default = plugins',
+                           default='plugins')
     return argparser.parse_args(sys_args)
 
 
@@ -48,15 +55,28 @@ def init_logging(args: Type[argparse.Namespace]):
         logging.getLogger().addHandler(handler)
 
 
+def furnish_app(app: Type[Flask]):
+    CORS(app)
+    spec = FlaskApiSpec(app)
+
+    plugger.init_app(app)
+
+    # must be called after all endpoints were registered
+    spec.register_existing_resources()
+
+
 def main(sys_args: list):
     args = get_args(sys_args)
     init_logging(args)
 
     app_config = {
-        'name': args.name
+        'name': args.name,
+        'prefix': '',
+        'plugin_dir': args.plugindir
     }
 
     app = rest.create_app(app_config)
+    furnish_app(app)
     app.run(port=args.port, debug=args.debug)
 
 

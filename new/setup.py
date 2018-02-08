@@ -17,6 +17,11 @@ setup(
     ],
     keywords='brewing brewpi brewblox embedded',
     packages=find_packages(exclude=['test']),
-    install_requires=[],
+    install_requires=[
+        'Flask',
+        'flask-cors',
+        'flask-apispec',
+        'flask-plugins',
+    ],
     extras_require={'dev': ['tox']}
 )
