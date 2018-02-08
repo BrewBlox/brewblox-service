@@ -27,14 +27,11 @@ def test_create_app(app_config):
 
 
 def test_shutdown(mocker, app, client):
-    assert client.get('shutdown').status_code == 500
+    assert client.post('shutdown').status_code == 500
 
     shutdown_mock = Mock()
     request_mock = mocker.patch('brewblox_service.rest.request')
     request_mock.environ.get.return_value = shutdown_mock
 
-    assert client.get('shutdown').status_code == 200
-    assert shutdown_mock.call_count == 1
-
     assert client.post('shutdown').status_code == 200
-    assert shutdown_mock.call_count == 2
+    assert shutdown_mock.call_count == 1
