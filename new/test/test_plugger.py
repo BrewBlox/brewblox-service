@@ -22,6 +22,8 @@ def test_endpoints(app, client):
     assert client.get('/system/plugins').status_code == 200
     # no plugin found with ID '1'
     assert client.get('/system/plugins/1').status_code == 500
+    # simulator can be found
+    assert client.get('/system/plugins/simulator').status_code == 200
 
 
 def test_no_plugin_dir(mocker, app):
