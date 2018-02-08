@@ -50,7 +50,7 @@ class Api():
 
 
 class Shutdown(View):
-    methods = ['GET', 'POST']
+    methods = ['POST']
 
     def shutdown_server(self):
         func = request.environ.get('werkzeug.server.shutdown')
