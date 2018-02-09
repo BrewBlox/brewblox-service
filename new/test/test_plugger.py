@@ -19,11 +19,21 @@ def test_init(mocker, app):
 
 def test_endpoints(app, client):
     plugger.init_app(app)
-    assert client.get('/system/plugins').status_code == 200
+
+    # enumerate all plugins
+    res = client.get('/system/plugins')
+    assert res.status_code == 200
+    assert res.json == ['simulator']
+
     # no plugin found with ID '1'
-    assert client.get('/system/plugins/1').status_code == 500
+    assert client.get('/system/plugins/1').status_code == 400
+
     # simulator can be found
-    assert client.get('/system/plugins/simulator').status_code == 200
+    res = client.get('/system/plugins/simulator')
+    assert res.status_code == 200
+    assert res.json
+    assert res.json['identifier'] == 'simulator'
+    assert res.json['name'] == 'BrewBlox Block Simulator'
 
 
 def test_no_plugin_dir(mocker, app):

@@ -1,6 +1,6 @@
 {
     "identifier": "simulator",
-    "name": "BrewBlox Service Simulator",
+    "name": "BrewBlox Block Simulator",
     "author": "Bob Steers",
     "license": "GPL v3",
     "version": "0.1"
