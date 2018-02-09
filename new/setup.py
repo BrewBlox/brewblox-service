@@ -23,6 +23,7 @@ setup(
         'flask-apispec',
         'flask-plugins',
         'pprint',
+        'dpath',
     ],
     extras_require={'dev': ['tox']}
 )
