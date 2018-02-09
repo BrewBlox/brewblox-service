@@ -1,5 +1,6 @@
 import logging
 from typing import Type
+import importlib
 
 from flask import Flask, jsonify, abort
 from flask.views import MethodView
@@ -29,12 +30,14 @@ def init_app(app: Type[Flask]):
     rest.register(app, '/system/plugins/<id>', PluginDetailsView)
 
     plugin_dir = app.config['plugin_dir']
-    LOGGER.info('Looking for plugins in "{}"'.format(plugin_dir))
+
+    if not importlib.util.find_spec(app.name):
+        LOGGER.warn('No module named "{}" - unable to load plugins.'.format(app.name))
+        return
 
     try:
         mgr = PluginManager(app, plugin_folder=plugin_dir)
-        LOGGER.info('Found plugins: {}'.format(mgr.plugins))
-        for m in mgr.plugins.values():
-            getattr(m, 'init_app') and m.init_app(app)
+        LOGGER.info('Plugin directory: "{}"'.format(mgr.plugin_folder))
+        LOGGER.info('Available plugins: {}'.format([*mgr.plugins.keys()]))
     except FileNotFoundError as ex:
-        LOGGER.warn('Plugin directory "{}" not found'.format(plugin_dir))
+        LOGGER.warn('Failed to load plugins: {}'.format(ex))

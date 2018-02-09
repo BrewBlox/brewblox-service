@@ -7,7 +7,7 @@ from pprint import pformat
 from typing import Type
 
 import dpath
-from flask import jsonify, request, Flask
+from flask import jsonify, request, current_app
 from flask.views import MethodView
 from flask_plugins import Plugin
 
@@ -44,11 +44,11 @@ class SimulatorPlugin(Plugin):
         super().__init__(*args, **kwargs)
         self._config = {}
 
-    def init_app(self, app: Type[Flask]):
-        """Performs initialization steps for which a reference to the Flask app is required"""
-        rest.register(app, '/simulator/config', ConfigView, plugin=self)
-        rest.register(app, '/simulator/values/<string:id>', FilteredValuesView, plugin=self)
-        rest.register(app, '/simulator/values/', ValuesView, plugin=self)
+    def setup(self):
+        """Performs setup steps - this is done inside the app context"""
+        rest.register(current_app, '/simulator/config', ConfigView, plugin=self)
+        rest.register(current_app, '/simulator/values/<string:id>', FilteredValuesView, plugin=self)
+        rest.register(current_app, '/simulator/values/', ValuesView, plugin=self)
 
     @property
     def config(self):

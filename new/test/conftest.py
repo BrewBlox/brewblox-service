@@ -33,6 +33,8 @@ def app(app_config):
     app = rest.create_app(app_config)
     # When we're testing, root path is one higher than it should be
     app.root_path = os.path.join(app.root_path, 'brewblox_service')
+    # For the plugin mechanism, we need a valid app name
+    app.name = 'brewblox_service'
     return app
 
 

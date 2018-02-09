@@ -9,7 +9,7 @@ def test_get_args():
     # test defaults
     args = main.get_args([])
     assert args.port == 5000
-    assert args.name == 'brewblox_service'
+    assert args.service == 'brewblox_service'
     assert not args.debug
     assert not args.output
 
@@ -18,8 +18,8 @@ def test_get_args():
     assert args.output == 'file_name'
 
     # test service name
-    args = main.get_args(['-n', 'service_name'])
-    assert args.name == 'service_name'
+    args = main.get_args(['-s', 'service_name'])
+    assert args.service == 'service_name'
 
     # test port
     args = main.get_args(['-p', '1234'])

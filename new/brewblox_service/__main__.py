@@ -25,8 +25,8 @@ def get_args(sys_args: list) -> Type[argparse.Namespace]:
                            type=int)
     argparser.add_argument('-o', '--output',
                            help='Logging output. Default = stdout')
-    argparser.add_argument('-n', '--name',
-                           help='Flask service name. Default = brewblox_service',
+    argparser.add_argument('-s', '--service',
+                           help='Service name. Should be a valid Python module. Default = brewblox_service',
                            default='brewblox_service')
     argparser.add_argument('--debug',
                            help='Run the Flask app in debug mode.',
@@ -65,12 +65,12 @@ def furnish_app(app: Type[Flask]):
     spec.register_existing_resources()
 
 
-def main(sys_args: list):
+def main(sys_args: list=sys.argv[1:]):
     args = get_args(sys_args)
     init_logging(args)
 
     app_config = {
-        'name': args.name,
+        'name': args.service,
         'prefix': '',
         'plugin_dir': args.plugindir
     }
@@ -81,4 +81,4 @@ def main(sys_args: list):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main()

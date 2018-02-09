@@ -39,3 +39,10 @@ def test_endpoints(app, client):
 def test_no_plugin_dir(mocker, app):
     app.config['plugin_dir'] = 'narnia'
     plugger.init_app(app)
+
+
+def test_invalid_app(mocker, app):
+    mgr_mock = mocker.patch('brewblox_service.plugger.PluginManager')
+    app.name = 'absolute nonsense'
+    plugger.init_app(app)
+    assert mgr_mock.call_count == 0
