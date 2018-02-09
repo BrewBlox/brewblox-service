@@ -22,6 +22,7 @@ setup(
         'flask-cors',
         'flask-apispec',
         'flask-plugins',
+        'pprint',
     ],
     extras_require={'dev': ['tox']}
 )

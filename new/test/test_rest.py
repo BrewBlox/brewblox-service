@@ -16,10 +16,18 @@ def test_register():
 
     rest.register(app_mock, '/end/point', view_mock)
     rest.register(app_mock, '///nested/end/point//', view_mock)
+    rest.register(app_mock, 'param/view', view_mock, param1='stuff', param2='val')
 
     app_mock.add_url_rule.assert_has_calls([
         call('/prefix/end/point', view_func=endpoint_mock),
-        call('/prefix/nested/end/point', view_func=endpoint_mock)
+        call('/prefix/nested/end/point', view_func=endpoint_mock),
+        call('/prefix/param/view', view_func=endpoint_mock)
+    ])
+
+    view_mock.as_view.assert_has_calls([
+        call(name='mock_name'),
+        call(name='mock_name'),
+        call(name='mock_name', param1='stuff', param2='val'),
     ])
 
 

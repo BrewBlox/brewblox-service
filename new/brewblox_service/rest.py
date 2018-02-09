@@ -22,17 +22,22 @@ class Shutdown(View):
         return 'Shutting down...'
 
 
-def register(app: Type[Flask], path: str, resource: Type[View]):
+def register(app: Type[Flask], path: str, resource: Type[View], **params):
     """Registers a new REST endpoint handler.
 
     Arguments:
         app (Flask): The Flask application that should host the resource.
         path (str): Relative endpoint path specifier.
         resource (View): Flask view that should handle requests to `path`.
+        params (kwargs): All additional arguments that should be passed to View.__init__.
     """
     path = '/{}/{}'.format(app.config['prefix'], path.rstrip('/'))
     path = re.sub(r'//+', '/', path)
-    app.add_url_rule(path, view_func=resource.as_view(name=resource.__name__.lower()))
+    app.add_url_rule(path,
+                     view_func=resource.as_view(
+                         name=resource.__name__.lower(),
+                         **params
+                     ))
     LOGGER.info('added route ("{}", {})'.format(path, resource))
 
 

@@ -29,7 +29,7 @@ def init_app(app: Type[Flask]):
     rest.register(app, '/system/plugins/<id>', PluginDetailsView)
 
     plugin_dir = app.config['plugin_dir']
-    logging.info('Looking for plugins in "{}"'.format(plugin_dir))
+    LOGGER.info('Looking for plugins in "{}"'.format(plugin_dir))
 
     try:
         mgr = PluginManager(app, plugin_folder=plugin_dir)
@@ -37,5 +37,4 @@ def init_app(app: Type[Flask]):
         for m in mgr.plugins.values():
             getattr(m, 'init_app') and m.init_app(app)
     except FileNotFoundError as ex:
-        LOGGER.exception(ex)
         LOGGER.warn('Plugin directory "{}" not found'.format(plugin_dir))
