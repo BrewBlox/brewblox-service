@@ -41,7 +41,7 @@ def init_logging(args: Type[argparse.Namespace]):
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s %(name)-30s %(levelname)-8s %(message)s',
-        datefmt='%y/%m/%d %H:%M:%S'
+        datefmt='%Y/%m/%d %H:%M:%S'
     )
 
     if args.output:
