@@ -37,8 +37,10 @@ def test_endpoints(app, client):
 
 
 def test_no_plugin_dir(mocker, app):
+    log_mock = mocker.patch('brewblox_service.plugger.LOGGER')
     app.config['plugin_dir'] = 'narnia'
     plugger.init_app(app)
+    assert log_mock.warn.call_count > 0
 
 
 def test_invalid_app(mocker, app):
