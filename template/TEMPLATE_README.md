@@ -4,6 +4,9 @@ There is some boilerplate code involved when creating a new Python package.
 
 The general idea is that you copy everything in here to your new repository or directory, update some placeholder names, and start coding.
 
+Everything listed under **Required Changes** must be done before the package works as intended.
+
+
 ## Files
 
 ### [setup.py](./setup.py)
@@ -33,12 +36,23 @@ Include all runtime requirements for your package here. See https://pip.pypa.io/
 The file works just like [requirements.txt](./requirements.txt), but should only list the packages needed to test the code. End users do not need these dependencies.
 
 
+### [MANIFEST.in](./MANIFEST.in)
+This file lists all non-code files that should be part of the package. 
+See https://docs.python.org/3.6/distutils/sourcedist.html#specifying-the-files-to-distribute for more info.
+
+For a basic plugin, you do not need to change anything in this file.
+
+
 ### [.coveragerc](./.coveragerc)
-This file contains some configuration for `pytest-cov`. In most normal cases, you do not have to change anything.
+This file contains some configuration for `pytest-cov`.
+
+For a basic plugin, you do not need to change anything in this file.
 
 
 ### [README.md](./README.md)
-TODO
+Your module readme. It will be the package description on Pypi.org, and automatically be displayed in Github.
+**Required Changes:**
+* Add all important info about your package here. What does your package do? How do you use it? What is your favorite color?
 
 
 ### [YOUR_PACKAGE/](./YOUR_PACKAGE/)
