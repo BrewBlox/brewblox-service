@@ -5,6 +5,9 @@ Test functions for brewblox_service.__main__
 from brewblox_service import __main__ as main
 
 
+TESTED = 'brewblox_service.__main__'
+
+
 def test_get_args():
     # test defaults
     args = main.get_args([])
@@ -35,8 +38,8 @@ def test_get_args():
 
 
 def test_init_logging(mocker):
-    log_mock = mocker.patch('brewblox_service.__main__.logging')
-    handler = mocker.patch('brewblox_service.__main__.TimedRotatingFileHandler').return_value
+    log_mock = mocker.patch(TESTED + '.logging')
+    handler = mocker.patch(TESTED + '.TimedRotatingFileHandler').return_value
 
     args = main.get_args([])
     main.init_logging(args)
@@ -56,12 +59,14 @@ def test_furnish_app(app):
 
 
 def test_main(mocker):
-    log_mock = mocker.patch('brewblox_service.__main__.init_logging')
-    app_mock = mocker.patch('brewblox_service.__main__.rest.create_app').return_value
-    furnish_mock = mocker.patch('brewblox_service.__main__.furnish_app')
+    log_mock = mocker.patch(TESTED + '.init_logging')
+    app_mock = mocker.patch(TESTED + '.rest.create_app').return_value
+    furnish_mock = mocker.patch(TESTED + '.furnish_app')
+    announce_mock = mocker.patch(TESTED + '.announcer.announce')
 
     main.main([])
 
     assert log_mock.call_count == 1
     assert furnish_mock.call_count == 1
+    assert announce_mock.call_count == 1
     assert app_mock

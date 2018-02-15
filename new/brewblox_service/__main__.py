@@ -14,7 +14,7 @@ from flask import Flask
 from flask_apispec import FlaskApiSpec
 from flask_cors import CORS
 
-from brewblox_service import rest, plugger
+from brewblox_service import rest, plugger, announcer
 
 
 def get_args(sys_args: list) -> Type[argparse.Namespace]:
@@ -26,21 +26,27 @@ def get_args(sys_args: list) -> Type[argparse.Namespace]:
     argparser.add_argument('-o', '--output',
                            help='Logging output. Default = stdout')
     argparser.add_argument('-s', '--service',
-                           help='Service name. Should be a valid Python module. Default = brewblox_service',
+                           help='Service id. Should be a valid Python module. Default = brewblox_service',
                            default='brewblox_service')
+    argparser.add_argument('-n', '--name',
+                           help='Custom service name. This will be used as prefix in the gateway.'
+                           ' Defaults to service id.')
     argparser.add_argument('--debug',
                            help='Run the Flask app in debug mode.',
                            action='store_true')
     argparser.add_argument('--plugindir',
                            help='Directory from which Flask plugins are loaded. Default = plugins',
                            default='plugins')
+    argparser.add_argument('-g', '--gateway',
+                           help='Gateway URL. Services will be announced here. Default = http://localhost:8081',
+                           default='http://localhost:8081')
     return argparser.parse_args(sys_args)
 
 
 def init_logging(args: Type[argparse.Namespace]):
     logging.basicConfig(
         level=logging.DEBUG,
-        format='%(asctime)s %(name)-30s %(levelname)-8s %(message)s',
+        format='%(asctime)s %(levelname)-8s %(name)-30s  %(message)s',
         datefmt='%Y/%m/%d %H:%M:%S'
     )
 
@@ -71,12 +77,16 @@ def main(sys_args: list=sys.argv[1:]):
 
     app_config = {
         'name': args.service,
+        'service_name': args.name or args.service,
+        'port': args.port,
         'prefix': '',
-        'plugin_dir': args.plugindir
+        'plugin_dir': args.plugindir,
+        'gateway': args.gateway
     }
 
     app = rest.create_app(app_config)
     furnish_app(app)
+    announcer.announce(app)
     app.run(port=args.port, debug=args.debug)
 
 

@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='brewblox-service',
-    version='0.1',
+    version='0.2',
     long_description=open('README.md').read(),
     url='https://github.com/BrewBlox/brewblox-service',
     author='BrewPi',
@@ -25,6 +25,7 @@ setup(
         'flask-plugins',
         'pprint',
         'dpath',
+        'requests',
     ],
     extras_require={'dev': ['tox']},
     entry_points={
