@@ -23,8 +23,11 @@ def log_enabled():
 def app_config() -> dict:
     return {
         'name': 'test_app',
+        'service_name': 'test_name',
         'prefix': '',
         'plugin_dir': 'plugins',
+        'port': 1234,
+        'gateway': 'http://gatewayaddr:1234'
     }
 
 

@@ -4,3 +4,4 @@ flask-apispec
 flask-plugins
 pprint
 dpath
+requests

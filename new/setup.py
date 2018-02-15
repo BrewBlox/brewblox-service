@@ -25,6 +25,7 @@ setup(
         'flask-plugins',
         'pprint',
         'dpath',
+        'requests',
     ],
     extras_require={'dev': ['tox']},
     entry_points={

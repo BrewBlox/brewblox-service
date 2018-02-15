@@ -13,7 +13,14 @@ LOGGER = logging.getLogger(__name__)
 
 class PluginsView(MethodView):
     def get(self):
-        return jsonify([p.identifier for p in get_enabled_plugins()])
+        plugins = []
+        try:
+            plugins = [p.identifier for p in get_enabled_plugins()]
+        except AttributeError as ex:
+            # get_enabled_plugins() throws if no plugins were found.
+            # we can ignore this.
+            pass
+        return jsonify(plugins)
 
 
 class PluginDetailsView(MethodView):
@@ -26,8 +33,8 @@ class PluginDetailsView(MethodView):
 
 
 def init_app(app: Type[Flask]):
-    rest.register(app, '/system/plugins', PluginsView)
-    rest.register(app, '/system/plugins/<id>', PluginDetailsView)
+    rest.register(app, '/_service/plugins', PluginsView)
+    rest.register(app, '/_service/plugins/<id>', PluginDetailsView)
 
     plugin_dir = app.config['plugin_dir']
 

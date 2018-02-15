@@ -46,9 +46,10 @@ class SimulatorPlugin(Plugin):
 
     def setup(self):
         """Performs setup steps - this is done inside the app context"""
-        rest.register(current_app, '/simulator/config', ConfigView, plugin=self)
-        rest.register(current_app, '/simulator/values/<string:id>', FilteredValuesView, plugin=self)
-        rest.register(current_app, '/simulator/values/', ValuesView, plugin=self)
+        rest.register(current_app, '/config', ConfigView, plugin=self)
+        rest.register(current_app, '/values/<string:id>',
+                      FilteredValuesView, plugin=self)
+        rest.register(current_app, '/values/', ValuesView, plugin=self)
 
     @property
     def config(self):

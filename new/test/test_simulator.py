@@ -45,35 +45,35 @@ def plugged(app):
 
 
 def test_config(client, plugged, sim_config):
-    res = client.get('/simulator/config')
+    res = client.get('/config')
     assert res.status_code == 200
     assert res.json == {}
 
     # no args supplied
-    assert client.post('/simulator/config').status_code == 500
+    assert client.post('/config').status_code == 500
 
     # actual config
-    assert client.post('/simulator/config', json=sim_config).status_code == 200
+    assert client.post('/config', json=sim_config).status_code == 200
 
     # now retrieve
-    res = client.get('/simulator/config')
+    res = client.get('/config')
     assert res.status_code == 200
     assert res.json == sim_config
 
 
 def test_values(client, plugged, sim_config):
-    assert client.post('/simulator/config', json=sim_config).status_code == 200
+    assert client.post('/config', json=sim_config).status_code == 200
 
-    res = client.get('/simulator/values')
+    res = client.get('/values')
     assert res.status_code == 200
     assert len(res.json) == 2
     assert res.json[0]['identifier'] in ['1.2.3', '2.3.4']
     print(res.json)
 
-    res = client.get('/simulator/values/1.2.3')
+    res = client.get('/values/1.2.3')
     assert res.status_code == 200
     assert res.json['identifier'] == '1.2.3'
 
-    res = client.get('/simulator/values/oilwell')
+    res = client.get('/values/oilwell')
     assert res.status_code == 200
     assert res.json == dict()

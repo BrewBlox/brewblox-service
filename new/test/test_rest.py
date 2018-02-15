@@ -32,11 +32,24 @@ def test_register():
 
 
 def test_shutdown(mocker, app, client):
-    assert client.post('/shutdown').status_code == 500
+    endpoint = '/_service/shutdown'
+    assert client.post(endpoint).status_code == 500
 
     shutdown_mock = Mock()
     request_mock = mocker.patch('brewblox_service.rest.request')
     request_mock.environ.get.return_value = shutdown_mock
 
-    assert client.post('/shutdown').status_code == 200
+    assert client.post(endpoint).status_code == 200
     assert shutdown_mock.call_count == 1
+
+
+def test_healthcheck(app, client):
+    endpoint = '/_service/status'
+
+    res = client.get(endpoint)
+    assert res.status_code == 200
+    assert res.json == {'status': 'ok'}
+
+
+def test_all_methods():
+    assert 'GET' in rest.all_methods()
