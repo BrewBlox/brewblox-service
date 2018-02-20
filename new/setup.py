@@ -26,6 +26,10 @@ setup(
         'pprint',
         'dpath',
         'requests',
+        'aiohttp',
+        'aiodns',
+        'cchardet',
+        'aiohttp-cors',
     ],
     extras_require={'dev': ['tox']},
     entry_points={
