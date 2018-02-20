@@ -64,10 +64,11 @@ async def auth_header(session: Type[ClientSession], gateway: str) -> dict:
 
 
 async def announce(app: Type[web.Application]):
-    gateway = app.config['gateway']
-    name = app.config['name']
-    host = app.config['host']
-    port = app.config['port']
+    config = app['config']
+    gateway = config['gateway']
+    name = config['name']
+    host = config['host']
+    port = config['port']
 
     async with ClientSession() as session:
         try:

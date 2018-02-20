@@ -20,7 +20,7 @@ def init_app(app: Type[web.Application]):
 
 
 class SimulatorService():
-    """Responsible for making functionality available to the Flask app.
+    """Responsible for making functionality available to the app.
 
     Keeps an internal 'config' object to mimic block configuration.
     The config makes some assumptions:

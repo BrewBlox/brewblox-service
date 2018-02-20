@@ -80,7 +80,7 @@ def create(args: Type[argparse.Namespace]=None) -> Type[web.Application]:
     }
 
     app = web.Application()
-    app.config = config
+    app['config'] = config
     return app
 
 
@@ -89,15 +89,20 @@ def furnish(app: Type[web.Application]) -> Type[web.Application]:
 
     # TODO(Bob): CORS support
     # TODO(Bob): swagger register routes
+    # TODO(Bob): admin dashboard / dev tools
 
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(announcer.announce(app))
+    # service functions are intentionally synchronous
+    # - web.run_app() assumes it is called from a synchronous context
+    # - pre-start performance / concurrency is not relevant
+    #
+    # announcer.announce() is technically async (it uses aiohttp client)
+    # asyncio.ensure_future() correctly handles desired behavior (async call in sync function)
     asyncio.ensure_future(announcer.announce(app))
 
 
 def run(app: Type[web.Application]):
-    host = app.config['host']
-    port = app.config['port']
+    host = app['config']['host']
+    port = app['config']['port']
 
-    # starts app in an async context
+    # starts app. run_app() will automatically start the async context.
     web.run_app(app, host=host, port=port)

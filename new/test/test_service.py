@@ -69,7 +69,7 @@ def test_create(sys_args, app_config, mocker):
     app = service.create(args)
 
     assert app is not None
-    assert app.config == app_config
+    assert app['config'] == app_config
 
 
 def test_create_no_args(sys_args, app_config, mocker):
@@ -77,7 +77,7 @@ def test_create_no_args(sys_args, app_config, mocker):
 
     app = service.create()
 
-    assert app.config == app_config
+    assert app['config'] == app_config
 
 
 async def test_furnish(app, client, mocker):

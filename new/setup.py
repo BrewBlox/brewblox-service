@@ -3,11 +3,11 @@ from setuptools import setup, find_packages
 
 setup(
     name='brewblox-service',
-    version='0.2',
+    version='0.3.0',
     long_description=open('README.md').read(),
     url='https://github.com/BrewBlox/brewblox-service',
     author='BrewPi',
-    author_email='elco@brewpi.com',
+    author_email='development@brewpi.com',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: GNU General Public License (GPL)',
@@ -17,7 +17,6 @@ setup(
     ],
     keywords='brewing brewpi brewblox embedded',
     packages=find_packages(exclude=['test']),
-    package_data={'brewblox_service': ['plugins/*/info.json']},
     install_requires=[
         'pprint',
         'dpath',
@@ -26,10 +25,5 @@ setup(
         'cchardet',
         'aiohttp-cors',
     ],
-    extras_require={'dev': ['tox']},
-    entry_points={
-        'console_scripts': [
-            'brewblox = brewblox_service.__main__:main'
-        ]
-    }
+    extras_require={'dev': ['tox']}
 )
