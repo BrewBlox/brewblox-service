@@ -24,6 +24,7 @@ setup(
         'aiodns',
         'cchardet',
         'aiohttp-cors',
+        'aiohttp-swagger',
     ],
     extras_require={'dev': ['tox']}
 )

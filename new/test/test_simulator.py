@@ -5,7 +5,7 @@ Tests functionality offered by brewblox_service.plugins.simulator
 import pytest
 from brewblox_service import simulator
 
-TESTED = 'brewblox_service.simulator'
+TESTED = simulator.__name__
 
 
 @pytest.fixture

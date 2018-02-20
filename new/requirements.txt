@@ -4,3 +4,4 @@ aiohttp
 aiodns
 cchardet
 aiohttp-cors
+aiohttp-swagger

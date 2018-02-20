@@ -53,25 +53,6 @@ class SimulatorService():
         LOGGER.info(f'updating simulator config to \n{pformat(val)}')
         self._config = val
 
-
-@routes.view('/config')
-class ConfigView(web.View):
-    """Allows getting and setting the simulator config."""
-
-    async def get(self):
-        sim = self.request.app['simulator']
-        return web.json_response(sim.config)
-
-    async def post(self):
-        sim = self.request.app['simulator']
-        sim.config = await self.request.json()
-        return web.json_response(dict(success=True))
-
-
-@routes.view('/values')
-class ValuesView(web.View):
-    """Allows getting randomized simulator state for all blocks."""
-
     def randomize(self, config: dict):
         for k, v in dpath.util.search(config, '**/state/*', yielded=True):
             new_val = 'value'
@@ -81,16 +62,6 @@ class ValuesView(web.View):
                 new_val = random.random() / random.random()
             dpath.util.new(config, k, new_val)
 
-    async def get(self):
-        sim = self.request.app['simulator']
-        self.randomize(sim.config)
-        return web.json_response(sim.config)
-
-
-@routes.view('/values/{id}')
-class FilteredValuesView(ValuesView):
-    """Allows getting randomized simulator state for a single block."""
-
     def filter(self, config: dict, id: str):
         for k, v in dpath.util.search(config, '**/identifier', yielded=True):
             if v == id:
@@ -99,9 +70,100 @@ class FilteredValuesView(ValuesView):
         # should not throw if identifier is absent
         return dict()
 
-    async def get(self):
-        id = self.request.match_info['id']
-        sim = self.request.app['simulator']
-        output = self.filter(sim.config, id)
-        self.randomize(output)
-        return web.json_response(output)
+
+@routes.get('/config')
+async def get_config(request):
+    """
+    ---
+    tags:
+    - simulator
+    summary: Get current config.
+    description: Get config currently used by simulator.
+    operationId: simulator.config
+    produces:
+    - application/json
+    """
+    sim = request.app['simulator']
+    return web.json_response(sim.config)
+
+
+@routes.post('/config')
+async def post_config(request):
+    """
+    ---
+    tags:
+    - simulator
+    summary: Update config.
+    description: Set new configuration to be returned by simulator.
+    operationId: simulator.config
+    produces:
+    - application/json
+    parameters:
+    -
+        in: body
+        name: body
+        description: New configuration
+        required: true
+        schema:
+            type: array
+            items:
+                properties:
+                    identifier:
+                        type: string
+                    name:
+                        type: string
+                    type_id:
+                        type: integer
+                        format: int64
+                    state:
+                        type: object
+                    settings:
+                        type: object
+    """
+    sim = request.app['simulator']
+    sim.config = await request.json()
+    return web.json_response(dict(success=True))
+
+
+@routes.get('/values')
+async def get_values(request):
+    """
+    ---
+    tags:
+    - simulator
+    summary: Get all config values.
+    description: Get randomized state for all values currently in config.
+    operationId: simulator.values
+    produces:
+    - application/json
+    """
+    sim = request.app['simulator']
+    sim.randomize(sim.config)
+    return web.json_response(sim.config)
+
+
+@routes.get('/values/{id}')
+async def get_specific_value(request):
+    """
+    ---
+    tags:
+    - simulator
+    summary: Get all config values.
+    description: Get randomized state for all values matching a specific identifier.
+    operationId: simulator.values.id
+    produces:
+    - application/json
+    parameters:
+    -
+        name: id
+        in: path
+        required: true
+        description: the unique identifier of the desired value
+        schema:
+            type: string
+    """
+    id = request.match_info['id']
+    sim = request.app['simulator']
+    output = sim.filter(sim.config, id)
+    sim.randomize(output)
+    return web.json_response(output)

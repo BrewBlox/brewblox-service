@@ -5,7 +5,7 @@ Tests brewblox_service.__main__.py
 from brewblox_service import __main__ as main
 
 
-TESTED = 'brewblox_service.__main__'
+TESTED = main.__name__
 
 
 def test_main(loop, mocker):

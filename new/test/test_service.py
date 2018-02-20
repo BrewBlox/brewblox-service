@@ -6,7 +6,7 @@ from brewblox_service import service
 from asynctest import CoroutineMock
 import pytest
 
-TESTED = 'brewblox_service.service'
+TESTED = service.__name__
 
 
 @pytest.fixture

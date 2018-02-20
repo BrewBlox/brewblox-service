@@ -6,7 +6,7 @@ from brewblox_service import announcer
 from aiohttp import ClientSession
 from aioresponses import aioresponses
 
-TESTED = 'brewblox_service.announcer'
+TESTED = announcer.__name__
 
 
 async def test_create_proxy_spec(app):
