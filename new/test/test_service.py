@@ -12,7 +12,7 @@ TESTED = 'brewblox_service.service'
 @pytest.fixture
 async def app(app, mocker):
     mocker.patch(TESTED + '.announcer.announce', CoroutineMock())
-    await service.furnish(app)
+    service.furnish(app)
     return app
 
 
@@ -63,8 +63,8 @@ def test_init_logging(mocker):
     log_mock.getLogger().addHandler.assert_called_once_with(handler)
 
 
-def test_create(sys_args, app_config):
-    args = service.parse_args(sys_args)
+def test_create(sys_args, app_config, mocker):
+    args = service.parse_args(sys_args[1:])
 
     app = service.create(args)
 
@@ -89,9 +89,9 @@ async def test_furnish(app, client, mocker):
     assert await res.json() == {'status': 'ok'}
 
 
-async def test_run(app, mocker, loop):
+def test_run(app, mocker, loop):
     run_mock = mocker.patch(TESTED + '.web.run_app')
 
-    await service.run(app)
+    service.run(app)
 
     run_mock.assert_called_once_with(app, host='localhost', port=1234)

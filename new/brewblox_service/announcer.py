@@ -6,7 +6,7 @@ import logging
 from typing import Type
 from urllib.parse import urljoin
 
-from requests.exceptions import ConnectionError
+from aiohttp.client_exceptions import ClientConnectorError
 from aiohttp import web, ClientSession
 
 LOGGER = logging.getLogger(__name__)
@@ -58,7 +58,8 @@ async def create_proxy_spec(name: str, host: str, port: int) -> dict:
 
 async def auth_header(session: Type[ClientSession], gateway: str) -> dict:
     async with session.post(urljoin(gateway, 'login'), json=CREDENTIALS) as res:
-        headers = {'authorization': 'Bearer ' + await res.json()['access_token']}
+        content = await res.json()
+        headers = {'authorization': 'Bearer ' + content['access_token']}
         return headers
 
 
@@ -83,5 +84,5 @@ async def announce(app: Type[web.Application]):
             # register service
             await session.post(url, headers=headers, json=spec)
 
-        except ConnectionError as ex:
+        except ClientConnectorError as ex:
             LOGGER.warn(f'failed to announce to gateway: {str(ex)}')

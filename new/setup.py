@@ -19,13 +19,8 @@ setup(
     packages=find_packages(exclude=['test']),
     package_data={'brewblox_service': ['plugins/*/info.json']},
     install_requires=[
-        'Flask',
-        'flask-cors',
-        'flask-apispec',
-        'flask-plugins',
         'pprint',
         'dpath',
-        'requests',
         'aiohttp',
         'aiodns',
         'cchardet',

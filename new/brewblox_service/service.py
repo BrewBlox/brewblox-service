@@ -10,8 +10,9 @@ from logging.handlers import TimedRotatingFileHandler
 from typing import Type
 
 from aiohttp import web
-import sys
+import sys  # noqa
 from brewblox_service import announcer
+import asyncio
 
 
 routes = web.RouteTableDef()
@@ -40,7 +41,7 @@ def _init_logging(args: Type[argparse.Namespace]):
         logging.getLogger().addHandler(handler)
 
 
-def parse_args(sys_args: list) -> Type[argparse.Namespace]:
+def parse_args(sys_args: list=None) -> Type[argparse.Namespace]:
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-H', '--host',
                            help='Host to which the app binds. Default = localhost',
@@ -53,8 +54,8 @@ def parse_args(sys_args: list) -> Type[argparse.Namespace]:
                            help='Logging output. Default = stdout')
     argparser.add_argument('-n', '--name',
                            help='Custom service name. This will be used as prefix in the gateway.'
-                           ' Defaults to application name (argv[0]) or "brewblox"',
-                           default=sys_args[0] if len(sys_args) else 'brewblox')
+                           ' Defaults = brewblox',
+                           default='brewblox')
     argparser.add_argument('--debug',
                            help='Run the app in debug mode.',
                            action='store_true')
@@ -66,7 +67,8 @@ def parse_args(sys_args: list) -> Type[argparse.Namespace]:
 
 def create(args: Type[argparse.Namespace]=None) -> Type[web.Application]:
     if args is None:
-        args = parse_args(sys.argv)
+        # parse system args
+        args = parse_args()
 
     _init_logging(args)
 
@@ -82,16 +84,20 @@ def create(args: Type[argparse.Namespace]=None) -> Type[web.Application]:
     return app
 
 
-async def furnish(app: Type[web.Application]) -> Type[web.Application]:
+def furnish(app: Type[web.Application]) -> Type[web.Application]:
     app.router.add_routes(routes)
 
     # TODO(Bob): CORS support
     # TODO(Bob): swagger register routes
-    await announcer.announce(app)
+
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(announcer.announce(app))
+    asyncio.ensure_future(announcer.announce(app))
 
 
-async def run(app: Type[web.Application]):
+def run(app: Type[web.Application]):
     host = app.config['host']
     port = app.config['port']
 
+    # starts app in an async context
     web.run_app(app, host=host, port=port)

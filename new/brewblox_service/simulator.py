@@ -1,25 +1,25 @@
 """
-Flask plugin implementation of a generic simulator for brewblox_service
+Default service implementation: a simulator
 """
+
 import logging
 import random
 from pprint import pformat
 from typing import Type
 
 import dpath
-from flask import jsonify, request, current_app
-from flask.views import MethodView
-from flask_plugins import Plugin
+from aiohttp import web
 
-from brewblox_service import rest
-
-__plugin__ = 'SimulatorPlugin'
+LOGGER = logging.getLogger(__name__)
+routes = web.RouteTableDef()
 
 
-LOGGER = logging.getLogger(__plugin__)
+def init_app(app: Type[web.Application]):
+    app.router.add_routes(routes)
+    app['simulator'] = SimulatorService()
 
 
-class SimulatorPlugin(Plugin):
+class SimulatorService():
     """Responsible for making functionality available to the Flask app.
 
     Keeps an internal 'config' object to mimic block configuration.
@@ -40,16 +40,8 @@ class SimulatorPlugin(Plugin):
     ]
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self):
         self._config = {}
-
-    def setup(self):
-        """Performs setup steps - this is done inside the app context"""
-        rest.register(current_app, '/config', ConfigView, plugin=self)
-        rest.register(current_app, '/values/<string:id>',
-                      FilteredValuesView, plugin=self)
-        rest.register(current_app, '/values/', ValuesView, plugin=self)
 
     @property
     def config(self):
@@ -58,31 +50,27 @@ class SimulatorPlugin(Plugin):
     @config.setter
     def config(self, val: dict):
         assert val
-        LOGGER.info('updating [{}] config to \n{}'
-                    .format(__plugin__, pformat(val)))
+        LOGGER.info(f'updating simulator config to \n{pformat(val)}')
         self._config = val
 
 
-class ConfigView(MethodView):
+@routes.view('/config')
+class ConfigView(web.View):
     """Allows getting and setting the simulator config."""
 
-    def __init__(self, plugin: Type[SimulatorPlugin]=None):
-        self.plugin = plugin
+    async def get(self):
+        sim = self.request.app['simulator']
+        return web.json_response(sim.config)
 
-    def get(self):
-        return jsonify(self.plugin.config)
-
-    def post(self):
-        assert request.json
-        self.plugin.config = request.json
-        return jsonify(dict(success=True))
+    async def post(self):
+        sim = self.request.app['simulator']
+        sim.config = await self.request.json()
+        return web.json_response(dict(success=True))
 
 
-class ValuesView(MethodView):
+@routes.view('/values')
+class ValuesView(web.View):
     """Allows getting randomized simulator state for all blocks."""
-
-    def __init__(self, plugin: Type[SimulatorPlugin]=None):
-        self.plugin = plugin
 
     def randomize(self, config: dict):
         for k, v in dpath.util.search(config, '**/state/*', yielded=True):
@@ -93,11 +81,13 @@ class ValuesView(MethodView):
                 new_val = random.random() / random.random()
             dpath.util.new(config, k, new_val)
 
-    def get(self):
-        self.randomize(self.plugin.config)
-        return jsonify(self.plugin.config)
+    async def get(self):
+        sim = self.request.app['simulator']
+        self.randomize(sim.config)
+        return web.json_response(sim.config)
 
 
+@routes.view('/values/{id}')
 class FilteredValuesView(ValuesView):
     """Allows getting randomized simulator state for a single block."""
 
@@ -109,7 +99,9 @@ class FilteredValuesView(ValuesView):
         # should not throw if identifier is absent
         return dict()
 
-    def get(self, id: str):
-        output = self.filter(self.plugin.config, id)
+    async def get(self):
+        id = self.request.match_info['id']
+        sim = self.request.app['simulator']
+        output = self.filter(sim.config, id)
         self.randomize(output)
-        return jsonify(output)
+        return web.json_response(output)

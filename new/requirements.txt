@@ -1,10 +1,5 @@
-Flask
-flask-cors
-flask-apispec
-flask-plugins
 pprint
 dpath
-requests
 aiohttp
 aiodns
 cchardet

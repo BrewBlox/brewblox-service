@@ -31,6 +31,7 @@ def app_config() -> dict:
 @pytest.fixture
 def sys_args(app_config) -> list:
     return [
+        'app_name',
         '--name', app_config['name'],
         '--host', app_config['host'],
         '--port', str(app_config['port']),
@@ -40,7 +41,7 @@ def sys_args(app_config) -> list:
 
 @pytest.fixture
 def app(sys_args):
-    args = service.parse_args(sys_args)
+    args = service.parse_args(sys_args[1:])
     app = service.create(args)
     return app
 
