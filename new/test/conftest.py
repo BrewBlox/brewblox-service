@@ -24,7 +24,8 @@ def app_config() -> dict:
         'name': 'test_app',
         'host': 'localhost',
         'port': 1234,
-        'gateway': 'http://gatewayaddr:1234'
+        'gateway': 'http://gatewayaddr:1234',
+        'debug': False,
     }
 
 

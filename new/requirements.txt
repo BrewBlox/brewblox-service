@@ -3,3 +3,4 @@ dpath
 aiohttp
 aiodns
 cchardet
+aiohttp-cors

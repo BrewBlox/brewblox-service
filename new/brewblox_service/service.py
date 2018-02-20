@@ -76,10 +76,11 @@ def create(args: Type[argparse.Namespace]=None) -> Type[web.Application]:
         'name': args.name,
         'host': args.host,
         'port': args.port,
-        'gateway': args.gateway
+        'gateway': args.gateway,
+        'debug': args.debug,
     }
 
-    app = web.Application()
+    app = web.Application(debug=args.debug)
     app['config'] = config
     return app
 
@@ -90,6 +91,10 @@ def furnish(app: Type[web.Application]) -> Type[web.Application]:
     # TODO(Bob): CORS support
     # TODO(Bob): swagger register routes
     # TODO(Bob): admin dashboard / dev tools
+
+    logger = logging.getLogger(__name__)
+    for route in app.router.routes():
+        logger.info(f'registered {route.resource.get_info()}')
 
     # service functions are intentionally synchronous
     # - web.run_app() assumes it is called from a synchronous context
