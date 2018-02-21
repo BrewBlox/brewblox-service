@@ -6,8 +6,8 @@ import logging
 from typing import Type
 from urllib.parse import urljoin
 
+from aiohttp import ClientSession, web
 from aiohttp.client_exceptions import ClientConnectorError
-from aiohttp import web, ClientSession
 
 LOGGER = logging.getLogger(__name__)
 CREDENTIALS = {

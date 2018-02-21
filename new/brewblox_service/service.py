@@ -5,16 +5,17 @@ Responsible for parsing user configuration, and creating top-level objects.
 """
 
 import argparse
+import asyncio
 import logging
+import sys  # noqa
 from logging.handlers import TimedRotatingFileHandler
 from typing import Type
 
-from aiohttp import web
-import sys  # noqa
-from brewblox_service import announcer
-import asyncio
-import aiohttp_swagger
 import aiohttp_cors
+import aiohttp_swagger
+from aiohttp import web
+
+from brewblox_service import announcer
 
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
@@ -110,10 +111,10 @@ def furnish(app: Type[web.Application]):
     # Configure default CORS settings.
     cors = aiohttp_cors.setup(app, defaults={
         "*": aiohttp_cors.ResourceOptions(
-                allow_credentials=True,
-                expose_headers="*",
-                allow_headers="*",
-            )
+            allow_credentials=True,
+            expose_headers="*",
+            allow_headers="*",
+        )
     })
 
     # Configure swagger settings
