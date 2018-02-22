@@ -25,6 +25,7 @@ setup(
         'cchardet',
         'aiohttp-cors',
         'aiohttp-swagger',
+        'aio-pika',
     ],
     extras_require={'dev': ['tox']}
 )
