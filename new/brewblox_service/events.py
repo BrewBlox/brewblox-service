@@ -269,7 +269,8 @@ async def post_publish(request):
     summary: Publish event.
     description: Publish a new event message to the event bus.
     operationId: events.publish
-    produces: text/plain
+    produces:
+    - text/plain
     parameters:
     -
         in: body
