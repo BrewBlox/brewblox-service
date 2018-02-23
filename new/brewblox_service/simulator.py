@@ -14,7 +14,7 @@ LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
 
 
-def init_app(app: Type[web.Application]):
+def setup(app: Type[web.Application]):
     app.router.add_routes(routes)
     app['simulator'] = SimulatorService()
 

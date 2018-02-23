@@ -60,6 +60,12 @@ def _init_logging(args: Type[argparse.Namespace]):
         handler.setLevel(level)
         logging.getLogger().addHandler(handler)
 
+    if not args.debug:
+        logging.getLogger('pika').setLevel(logging.CRITICAL)
+        logging.getLogger('pika.adapters.base_connection').setLevel(logging.CRITICAL)
+        logging.getLogger('aio_pika.robust_connection').setLevel(logging.CRITICAL)
+        logging.getLogger('asyncio').setLevel(logging.CRITICAL)
+
 
 def parse_args(sys_args: list=None) -> Type[argparse.Namespace]:
     argparser = argparse.ArgumentParser()

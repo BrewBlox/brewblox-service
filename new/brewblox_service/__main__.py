@@ -13,21 +13,19 @@ def main():
 
     # Add implementation-specific functionality
     # In this case: simulator
-    simulator.init_app(app)
+    simulator.setup(app)
 
+    # Event handling is optional
+    # It should be enabled explicitly by service implementations
     events.setup(app)
-    # events.subscribe(app, 'brewblox', 'bb_queue')
-    # events.subscribe(app, 'brewblox', 'controller')
 
-    async def on_message(message):
-        logging.info(f'Message received: {message}')
-
-    async def on_json(queue, message: dict):
-        logging.info(f'JSON message: {message}')
+    async def on_message(queue, message: str):
+        logging.info(f'Message from {queue}: {message} ({type(message)})')
 
     listener = events.get_listener(app)
-    listener.subscribe(app, 'brewblox', 'controller1', on_json=on_json)
-    listener.subscribe(app, 'brewblox', 'controller2', on_json=on_json)
+    listener.subscribe('brewblox', 'controller', on_message=on_message)
+    listener.subscribe('brewblox', 'controller.*', on_message=on_message)
+    listener.subscribe('brewblox', 'controller.#', on_message=on_message)
 
     # Add all default endpoints, and announce service to gateway
     service.furnish(app)

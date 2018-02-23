@@ -27,7 +27,7 @@ async def read_main(loop):
             logging.info(message.body)
 
 
-async def send_main(loop, routing_key):
+async def send_main(loop, routing_key, count):
     connection = await aio_pika.connect_robust(loop=loop)
 
     channel = await connection.channel()    # type: aio_pika.Channel
@@ -35,7 +35,7 @@ async def send_main(loop, routing_key):
     message = json.dumps(dict(key=routing_key))
     logging.info(f'sending {message}')
 
-    for i in range(0, 100):
+    for i in range(0, count):
         await exchange.publish(
             aio_pika.Message(
                 body=message.encode()
@@ -58,6 +58,7 @@ if __name__ == "__main__":
     logging.getLogger('aio_pika').setLevel(logging.WARNING)
 
     key = sys.argv[1]
-    loop.run_until_complete(send_main(loop, key))
+    count = int(sys.argv[2]) if len(sys.argv) >= 3 else 1
+    loop.run_until_complete(send_main(loop, key, count))
 
     loop.close()
