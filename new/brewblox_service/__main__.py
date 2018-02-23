@@ -5,7 +5,6 @@ This will create the app, and run a simulator.
 """
 
 from brewblox_service import service, simulator, events
-import logging
 
 
 def main():
@@ -18,14 +17,6 @@ def main():
     # Event handling is optional
     # It should be enabled explicitly by service implementations
     events.setup(app)
-
-    async def on_message(queue, message: str):
-        logging.info(f'Message from {queue}: {message} ({type(message)})')
-
-    listener = events.get_listener(app)
-    listener.subscribe('brewblox', 'controller', on_message=on_message)
-    listener.subscribe('brewblox', 'controller.*', on_message=on_message)
-    listener.subscribe('brewblox', 'controller.#', on_message=on_message)
 
     # Add all default endpoints, and announce service to gateway
     service.furnish(app)
