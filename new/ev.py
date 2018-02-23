@@ -3,6 +3,7 @@ import aio_pika
 import logging
 from aio_pika.exchange import ExchangeType
 import sys
+import json
 
 
 async def read_main(loop):
@@ -31,11 +32,13 @@ async def send_main(loop, routing_key):
 
     channel = await connection.channel()    # type: aio_pika.Channel
     exchange = await channel.declare_exchange('brewblox', type=ExchangeType.TOPIC, auto_delete=True)
+    message = json.dumps(dict(key=routing_key))
+    logging.info(f'sending {message}')
 
     for i in range(0, 100):
         await exchange.publish(
             aio_pika.Message(
-                body=f'Hello {routing_key}'.encode()
+                body=message.encode()
             ),
             routing_key=routing_key
         )
@@ -55,7 +58,6 @@ if __name__ == "__main__":
     logging.getLogger('aio_pika').setLevel(logging.WARNING)
 
     key = sys.argv[1]
-    logging.info(f'sending {key}')
     loop.run_until_complete(send_main(loop, key))
 
     loop.close()

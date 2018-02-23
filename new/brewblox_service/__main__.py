@@ -25,7 +25,9 @@ def main():
     async def on_json(queue, message: dict):
         logging.info(f'JSON message: {message}')
 
-    events.subscribe(app, 'brewblox', 'controller', on_json=on_json)
+    listener = events.get_listener(app)
+    listener.subscribe(app, 'brewblox', 'controller1', on_json=on_json)
+    listener.subscribe(app, 'brewblox', 'controller2', on_json=on_json)
 
     # Add all default endpoints, and announce service to gateway
     service.furnish(app)
