@@ -4,7 +4,7 @@ Entry point for standalone brewblox_service.
 This will create the app, and run a simulator.
 """
 
-from brewblox_service import service, simulator, events
+from brewblox_service import events, service, simulator
 
 
 def main():

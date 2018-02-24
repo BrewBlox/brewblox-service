@@ -5,7 +5,7 @@ Example use:
 
     events.setup(app)
 
-    async def on_message(queue, key: str, message: str):
+    async def on_message(queue, key, message):
         logging.info(f'Message from {queue}: {key} = {message} ({type(message)})')
 
     listener = events.get_listener(app)
@@ -14,9 +14,9 @@ Example use:
     listener.subscribe('brewblox', 'controller.#', on_message=on_message)
 """
 
+import asyncio
 import json
 import logging
-from asyncio import Queue, ensure_future
 from concurrent.futures import CancelledError
 from typing import Callable, Type, Union
 
@@ -68,10 +68,6 @@ class EventSubscription():
         return f'<{self._routing} @ {self._exchange_name}>'
 
     @property
-    def queue(self) -> Type[aio_pika.Queue]:
-        return self._queue
-
-    @property
     def on_message(self) -> EVENT_CALLBACK_:
         return self._on_message
 
@@ -87,7 +83,7 @@ class EventSubscription():
                                                   auto_delete=True)
         self._queue = await channel.declare_queue(self._routing, exclusive=True)
         await self._queue.bind(exchange, self._routing)
-        await self.queue.consume(self._relay)
+        await self._queue.consume(self._relay)
 
     async def _relay(self, message: Type[aio_pika.IncomingMessage]):
         """Relays incoming messages between the queue and the user callback"""
@@ -99,23 +95,63 @@ class EventSubscription():
 
 
 class EventListener():
-    def __init__(self, app: Type[web.Application]):
+    def __init__(self, app: Type[web.Application]=None):
         # Asyncio queues need a context loop
-        # We'll initialize self._pending on app startup
+        # We'll initialize self._pending when we have one
         self._pending_pre_async = []
         self._pending = None
         self._connection = None
         self._task = None
 
-        # Check whether the app is already running
-        # We can either directly schedule our startup, or wait until app startup
-        if app.loop:
-            ensure_future(self._startup(app), loop=app.loop)
-        else:
-            app.on_startup.append(self._startup)
+        if app:
+            self.setup(app)
 
-        # Always schedule desctruction in app cleanup
+    def __str__(self):
+        return f'<{type(self).__name__} {self._connection}>'
+
+    def setup(self, app):
+        app.on_startup.append(self._startup)
         app.on_cleanup.append(self._cleanup)
+
+    async def _startup(self, app: Type[web.Application]):
+        await self.start(app.loop)
+
+    async def _cleanup(self, app: Type[web.Application]):
+        await self.close()
+
+    def _on_connected(self, connection):
+        if not connection.is_closed:
+            LOGGER.info(f'Connected {self}')
+            self._task = connection.loop.create_task(self._listen())
+
+    async def start(self, loop):
+        # Initialize the async queue now we know which loop we're using
+        self._pending = asyncio.Queue(loop=loop)
+
+        # Transfer all subscriptions that were made before the event loop started
+        [self._pending.put_nowait(s) for s in self._pending_pre_async]
+
+        # We won't be needing this anymore
+        self._pending_pre_async = None
+
+        # Create the connection
+        # We want to start listening it now, and whenever we reconnect
+        self._connection = await aio_pika.connect_robust(loop=loop)
+        self._connection.add_reconnect_callback(self._on_connected)
+        self._on_connected(self._connection)
+
+    async def close(self):
+        LOGGER.info(f'Closing {self}')
+
+        if self._task:
+            try:
+                self._task.cancel()
+                await self._task
+            except CancelledError:
+                pass
+
+        if self._connection and not self._connection.is_closed:
+            await self._connection.close()
 
     def subscribe(self,
                   exchange_name: str,
@@ -147,40 +183,6 @@ class EventListener():
         LOGGER.info(f'New event bus subscription: [{sub}]')
         return sub
 
-    async def _startup(self, app):
-        # Initialize the async queue now we know which loop we're using
-        self._pending = Queue(loop=app.loop)
-
-        # Transfer all subscriptions that were made before the event loop started
-        [self._pending.put_nowait(s) for s in self._pending_pre_async]
-
-        # We won't be needing this anymore
-        self._pending_pre_async = None
-
-        # Create the connection
-        # We want to start listening it now, and whenever we reconnect
-        self._connection = await aio_pika.connect_robust(loop=app.loop)
-        self._connection.add_reconnect_callback(self._schedule)
-        self._schedule(self._connection)
-
-    async def _cleanup(self, app):
-        """Shutdown hook for the listener.
-
-        Cleans up tasks and resources."""
-        LOGGER.info(f'Cleaning up event listener for {self._connection}')
-
-        if self._task:
-            self._task.cancel()
-            await self._task
-
-        if self._connection and not self._connection.is_closed:
-            await self._connection.close()
-
-    def _schedule(self, connection):
-        if not connection.is_closed:
-            LOGGER.info(f'Event listener connected to {connection}')
-            self._task = connection.loop.create_task(self._listen())
-
     async def _listen(self):
         try:
             while not self._connection.is_closed:
@@ -190,44 +192,49 @@ class EventListener():
                 if not self._connection.is_closed:
                     await subscription.declare_on_remote(self._connection)
 
-                else:
+                else:  # pragma: no cover
                     # Connection closed while retrieving
-                    # We'll have to declare it later
-                    # Put it back in the queue
+                    # Put it back in the queue, we'll declare it after reconnect
                     self._pending.put_nowait(subscription)
 
-        except RuntimeError as ex:
-            LOGGER.warn(f'Event listener error: {ex}. Connection = {self._connection}')
+        except RuntimeError as ex:  # pragma: no cover
+            LOGGER.warn(f'Error in {self} {ex}')
         except CancelledError:
-            LOGGER.info(f'Event listener cancelled for {self._connection}')
+            LOGGER.info(f'Cancelled {self}')
 
 
 class EventPublisher():
-    def __init__(self, app: Type[web.Application]):
+    def __init__(self, app: Type[web.Application]=None):
         self._connection = None
         self._channel = None
 
-        # Check whether the app is already running
-        # We can either directly schedule our startup, or wait until app startup
-        if app.loop:
-            ensure_future(self._startup(app), loop=app.loop)
-        else:
-            app.on_startup.append(self._startup)
+        if app:
+            self.setup(app)
 
-        # Always schedule desctruction in app cleanup
+    def __str__(self):
+        return f'<{type(self).__name__} {self._connection}>'
+
+    def setup(self, app):
+        app.on_startup.append(self._startup)
         app.on_cleanup.append(self._cleanup)
 
-    async def _startup(self, app):
+    async def _startup(self, app: Type[web.Application]):
+        await self.start(app.loop)
+
+    async def _cleanup(self, app: Type[web.Application]):
+        await self.close()
+
+    async def start(self, loop):
         def _on_connected(connection):
             if not connection.is_closed:
-                LOGGER.info(f'Event publisher connected to {connection}')
+                LOGGER.info(f'Connected {self}')
 
-        self._connection = await aio_pika.connect_robust(loop=app.loop)
+        self._connection = await aio_pika.connect_robust(loop=loop)
         self._connection.add_reconnect_callback(_on_connected)
         _on_connected(self._connection)
 
-    async def _cleanup(self, app):
-        LOGGER.info(f'Cleaning up event publisher for {self._connection}')
+    async def close(self):
+        LOGGER.info(f'Closing {self}')
         if self._connection and not self._connection.is_closed:
             await self._connection.close()
 

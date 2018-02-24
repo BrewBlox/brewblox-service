@@ -148,7 +148,7 @@ def furnish(app: Type[web.Application]):
                                   description='',
                                   title='Brewblox Service',
                                   api_version='0.3.0',
-                                  # api_base_url=prefix,
+                                  api_base_url=prefix,
                                   contact='development@brewpi.com')
 
     for route in app.router.routes():

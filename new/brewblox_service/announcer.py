@@ -6,7 +6,7 @@ import logging
 from typing import Type
 from urllib.parse import urljoin
 
-from aiohttp import ClientSession, web, hdrs
+from aiohttp import ClientSession, hdrs, web
 
 LOGGER = logging.getLogger(__name__)
 CREDENTIALS = {
@@ -64,7 +64,7 @@ async def announce(app: Type[web.Application]):
             spec = await create_proxy_spec(name, host, port)
             headers = await auth_header(session, gateway)
 
-            LOGGER.debug(f'announcing spec: {spec}')
+            LOGGER.debug(f'Announcing spec: {spec}')
 
             # try to unregister previous instance of API
             delete_url = urljoin(gateway, f'apis/{name}')
@@ -76,4 +76,4 @@ async def announce(app: Type[web.Application]):
             LOGGER.info(f'Announced to {url} as [{name}]')
 
         except Exception as ex:
-            LOGGER.warn(f'failed to announce to gateway: {str(ex)}')
+            LOGGER.warn(f'Failed gateway announce: {str(ex)}')
