@@ -135,6 +135,8 @@ def furnish(app: Type[web.Application]):
         route.resource.add_prefix(prefix)
 
         # Add CORS
+        # TODO(Bob): Remove static resource instance check when aiohttp-cors bug is fixed
+        # Issue: https://github.com/aio-libs/aiohttp-cors/issues/155
         if not isinstance(route.resource, web.StaticResource):
             cors.add(route)
             LOGGER.debug(f'Enabled CORS for {route.resource}')

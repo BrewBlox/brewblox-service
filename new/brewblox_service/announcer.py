@@ -22,7 +22,7 @@ async def create_proxy_spec(name: str, host: str, port: int) -> dict:
         'name': name,
         'active': True,
         'proxy': {
-            # Strips 'listen_path'
+            # listen path is part of actual endpoint
             'strip_path': False,
             # Appends everything past 'listen_path'
             'append_path': True,
