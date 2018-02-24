@@ -81,7 +81,7 @@ class EventSubscription():
         exchange = await channel.declare_exchange(self._exchange_name,
                                                   type=self._exchange_type,
                                                   auto_delete=True)
-        self._queue = await channel.declare_queue(self._routing, exclusive=True)
+        self._queue = await channel.declare_queue(exclusive=True)
         await self._queue.bind(exchange, self._routing)
         await self._queue.consume(self._relay)
 
