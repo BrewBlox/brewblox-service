@@ -2,8 +2,10 @@
 Tests functionality offered by brewblox_service.plugins.simulator
 """
 
-from brewblox_service import plugger
 import pytest
+from brewblox_service import simulator
+
+TESTED = simulator.__name__
 
 
 @pytest.fixture
@@ -39,41 +41,46 @@ def sim_config():
 
 
 @pytest.fixture
-def plugged(app):
-    plugger.init_app(app)
+async def app(app):
+    """App with simulator functions added"""
+    simulator.init_app(app)
     return app
 
 
-def test_config(client, plugged, sim_config):
-    res = client.get('/config')
-    assert res.status_code == 200
-    assert res.json == {}
+async def test_config(client, sim_config):
+    res = await client.get('/config')
+    assert res.status == 200
+    assert await res.json() == {}
 
     # no args supplied
-    assert client.post('/config').status_code == 500
+    res = await client.post('/config')
+    assert res.status == 500
 
     # actual config
-    assert client.post('/config', json=sim_config).status_code == 200
+    res = await client.post('/config', json=sim_config)
+    assert res.status == 200
 
     # now retrieve
-    res = client.get('/config')
-    assert res.status_code == 200
-    assert res.json == sim_config
+    res = await client.get('/config')
+    assert res.status == 200
+    assert await res.json() == sim_config
 
 
-def test_values(client, plugged, sim_config):
-    assert client.post('/config', json=sim_config).status_code == 200
+async def test_values(client, sim_config):
+    res = await client.post('/config', json=sim_config)
+    assert res.status == 200
 
-    res = client.get('/values')
-    assert res.status_code == 200
-    assert len(res.json) == 2
-    assert res.json[0]['identifier'] in ['1.2.3', '2.3.4']
-    print(res.json)
+    res = await client.get('/values')
+    assert res.status == 200
+    content = await res.json()
+    assert len(content) == 2
+    assert content[0]['identifier'] in ['1.2.3', '2.3.4']
 
-    res = client.get('/values/1.2.3')
-    assert res.status_code == 200
-    assert res.json['identifier'] == '1.2.3'
+    res = await client.get('/values/1.2.3')
+    assert res.status == 200
+    content = await res.json()
+    assert content['identifier'] == '1.2.3'
 
-    res = client.get('/values/oilwell')
-    assert res.status_code == 200
-    assert res.json == dict()
+    res = await client.get('/values/oilwell')
+    assert res.status == 200
+    assert await res.json() == dict()

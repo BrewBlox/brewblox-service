@@ -6,27 +6,32 @@ import logging
 from typing import Type
 from urllib.parse import urljoin
 
-import requests
-from flask import Flask
-from requests.exceptions import ConnectionError
-
-from brewblox_service import rest
+from aiohttp import ClientSession, web
+from aiohttp.client_exceptions import ClientConnectorError
 
 LOGGER = logging.getLogger(__name__)
 CREDENTIALS = {
     'username': 'admin',
     'password': 'admin'
 }
+ALL_METHODS = [
+    'GET',
+    'HEAD',
+    'POST',
+    'PUT',
+    'DELETE',
+    'CONNECT',
+    'OPTIONS',
+    'TRACE',
+    'PATCH'
+]
 
 
-def create_proxy_spec(app: Type[Flask]) -> dict:
-    port = app.config['port']
-    prefix = app.config['prefix']
-    identifier = app.config['service_name']
-    url = urljoin(f'http://localhost:{port}', prefix)
+async def create_proxy_spec(name: str, host: str, port: int) -> dict:
+    url = f'http://{host}:{port}'
 
     spec = {
-        'name': identifier,
+        'name': name,
         'active': True,
         'proxy': {
             # Strips 'listen_path'
@@ -34,9 +39,9 @@ def create_proxy_spec(app: Type[Flask]) -> dict:
             # Appends everything past 'listen_path'
             'append_path': True,
             # Alls calls that match this are forwarded
-            'listen_path': f'/{identifier}/*',
+            'listen_path': f'/{name}/*',
             # HTTP methods of these types are forwarded
-            'methods': rest.all_methods(),
+            'methods': ALL_METHODS,
             # Addresses to which requests are forwarded
             'upstreams': {
                 'balancing': 'roundrobin',
@@ -51,29 +56,34 @@ def create_proxy_spec(app: Type[Flask]) -> dict:
     return spec
 
 
-def auth_header(gateway: str) -> dict:
-    res = requests.post(urljoin(gateway, 'login'), json=CREDENTIALS)
-    headers = {'authorization': 'Bearer ' + res.json()['access_token']}
-    return headers
+async def auth_header(session: Type[ClientSession], gateway: str) -> dict:
+    async with session.post(urljoin(gateway, 'login'), json=CREDENTIALS) as res:
+        content = await res.json()
+        headers = {'authorization': 'Bearer ' + content['access_token']}
+        return headers
 
 
-def announce(app: Type[Flask]):
-    gateway = app.config['gateway']
-    service_name = app.config['service_name']
+async def announce(app: Type[web.Application]):
+    config = app['config']
+    gateway = config['gateway']
+    name = config['name']
+    host = config['host']
+    port = config['port']
 
-    try:
-        url = urljoin(gateway, 'apis')
-        spec = create_proxy_spec(app)
-        headers = auth_header(gateway)
+    async with ClientSession() as session:
+        try:
+            url = urljoin(gateway, 'apis')
+            spec = await create_proxy_spec(name, host, port)
+            headers = await auth_header(session, gateway)
 
-        LOGGER.debug(f'announcing spec: {spec}')
+            LOGGER.debug(f'announcing spec: {spec}')
 
-        # try to unregister previous instance of API
-        delete_url = urljoin(gateway, f'apis/{service_name}')
-        requests.delete(delete_url, headers=headers)
+            # try to unregister previous instance of API
+            delete_url = urljoin(gateway, f'apis/{name}')
+            await session.delete(delete_url, headers=headers)
 
-        # register service
-        requests.post(url, headers=headers, json=spec)
+            # register service
+            await session.post(url, headers=headers, json=spec)
 
-    except ConnectionError as ex:
-        LOGGER.warn(f'failed to announce to gateway: {str(ex)}')
+        except ClientConnectorError as ex:
+            LOGGER.warn(f'failed to announce to gateway: {str(ex)}')
