@@ -182,14 +182,14 @@ async def test_publish_endpoint(app, client, mocker):
     publish_spy = mocker.spy(events.get_publisher(app), 'publish')
 
     # standard ok
-    assert (await client.post('/publish', json=dict(
+    assert (await client.post('/_debug/publish', json=dict(
         exchange='exchange',
         routing='first',
         message=dict(key='val')
     ))).status == 200
 
     # string messages supported
-    assert (await client.post('/publish', json=dict(
+    assert (await client.post('/_debug/publish', json=dict(
         exchange='exchange',
         routing='second',
         message='message'
@@ -197,7 +197,7 @@ async def test_publish_endpoint(app, client, mocker):
 
     # return 500 on connection refused
     events.get_publisher(app)._connection.is_closed = True
-    assert (await client.post('/publish', json=dict(
+    assert (await client.post('/_debug/publish', json=dict(
         exchange='exchange',
         routing='third',
         message='message'

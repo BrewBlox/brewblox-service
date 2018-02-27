@@ -267,7 +267,7 @@ class EventPublisher():
         )
 
 
-@routes.post('/publish')
+@routes.post('/_debug/publish')
 async def post_publish(request):
     """
     ---
