@@ -1,5 +1,5 @@
 """
-Tests functionality offered by brewblox_service.plugins.simulator
+Tests functionality offered by brewblox_service.simulator
 """
 
 import pytest
@@ -43,7 +43,7 @@ def sim_config():
 @pytest.fixture
 async def app(app):
     """App with simulator functions added"""
-    simulator.init_app(app)
+    simulator.setup(app)
     return app
 
 

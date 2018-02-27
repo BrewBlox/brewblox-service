@@ -2,9 +2,12 @@
 Test functions in brewblox_service.service.py
 """
 
-from brewblox_service import service
-from asynctest import CoroutineMock
+from unittest.mock import call
+
 import pytest
+from asynctest import CoroutineMock
+
+from brewblox_service import service
 
 TESTED = service.__name__
 
@@ -12,6 +15,7 @@ TESTED = service.__name__
 @pytest.fixture
 async def app(app, mocker):
     mocker.patch(TESTED + '.announcer.announce', CoroutineMock())
+    app.router.add_static(prefix='/static', path='/usr')
     service.furnish(app)
     return app
 
@@ -56,11 +60,31 @@ def test_init_logging(mocker):
     assert log_mock.basicConfig.call_count == 1
     assert log_mock.getLogger().addHandler.call_count == 0
 
+    log_mock.getLogger.assert_has_calls([
+        call('pika'),
+        call().setLevel(log_mock.CRITICAL),
+        call('pika.adapters.base_connection'),
+        call().setLevel(log_mock.CRITICAL),
+        call('aio_pika.robust_connection'),
+        call().setLevel(log_mock.CRITICAL),
+        call('asyncio'),
+        call().setLevel(log_mock.CRITICAL),
+    ])
+
     args = service.parse_args(['-o', 'outfile'])
     service._init_logging(args)
 
     assert log_mock.basicConfig.call_count == 2
     log_mock.getLogger().addHandler.assert_called_once_with(handler)
+
+
+def test_no_logging_mute(mocker):
+    log_mock = mocker.patch(TESTED + '.logging')
+
+    args = service.parse_args(['--debug'])
+    service._init_logging(args)
+
+    assert log_mock.getLogger.call_count == 0
 
 
 def test_create(sys_args, app_config, mocker):
@@ -80,11 +104,11 @@ def test_create_no_args(sys_args, app_config, mocker):
     assert app['config'] == app_config
 
 
-async def test_furnish(app, client, mocker):
+async def test_furnish(app, client):
     # mocked in app fixture
     assert service.announcer.announce.call_count == 1
 
-    res = await client.get('/_service/status')
+    res = await client.get('/test_app/_service/status')
     assert res.status == 200
     assert await res.json() == {'status': 'ok'}
 

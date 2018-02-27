@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='brewblox-service',
-    version='0.3.0',
+    version='0.3.1',
     long_description=open('README.md').read(),
     url='https://github.com/BrewBlox/brewblox-service',
     author='BrewPi',
@@ -25,6 +25,7 @@ setup(
         'cchardet',
         'aiohttp-cors',
         'aiohttp-swagger',
+        'aio-pika',
     ],
     extras_require={'dev': ['tox']}
 )

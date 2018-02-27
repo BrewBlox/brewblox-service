@@ -24,8 +24,6 @@ routes = web.RouteTableDef()
 @routes.get('/_service/status')
 async def healthcheck(request: Type[web.Request]) -> Type[web.Response]:
     """
-    Description end-point
-
     ---
     tags:
     - Service
@@ -59,6 +57,12 @@ def _init_logging(args: Type[argparse.Namespace]):
         handler.setFormatter(logging.Formatter(format, datefmt))
         handler.setLevel(level)
         logging.getLogger().addHandler(handler)
+
+    if not args.debug:
+        logging.getLogger('pika').setLevel(logging.CRITICAL)
+        logging.getLogger('pika.adapters.base_connection').setLevel(logging.CRITICAL)
+        logging.getLogger('aio_pika.robust_connection').setLevel(logging.CRITICAL)
+        logging.getLogger('asyncio').setLevel(logging.CRITICAL)
 
 
 def parse_args(sys_args: list=None) -> Type[argparse.Namespace]:
@@ -106,6 +110,7 @@ def create(args: Type[argparse.Namespace]=None) -> Type[web.Application]:
 
 
 def furnish(app: Type[web.Application]):
+    prefix = '/' + app['config']['name'].lstrip('/')
     app.router.add_routes(routes)
 
     # Configure default CORS settings.
@@ -117,8 +122,29 @@ def furnish(app: Type[web.Application]):
         )
     })
 
+    # Configure CORS and prefixes on all endpoints.
+    known_resources = set()
+    for route in list(app.router.routes()):
+        if route.resource in known_resources:
+            continue
+
+        # Add to known
+        known_resources.add(route.resource)
+
+        # Add prefix
+        route.resource.add_prefix(prefix)
+
+        # Add CORS
+        # TODO(Bob): Remove static resource instance check when aiohttp-cors bug is fixed
+        # Issue: https://github.com/aio-libs/aiohttp-cors/issues/155
+        if not isinstance(route.resource, web.StaticResource):
+            cors.add(route)
+            LOGGER.debug(f'Enabled CORS for {route.resource}')
+
     # Configure swagger settings
+    # We set prefix explicitly here
     aiohttp_swagger.setup_swagger(app,
+                                  swagger_url=prefix + '/api/doc',
                                   description='',
                                   title='Brewblox Service',
                                   api_version='0.3.0',
@@ -126,18 +152,6 @@ def furnish(app: Type[web.Application]):
 
     for route in app.router.routes():
         LOGGER.info(f'Registered [{route.method}] {route.resource}')
-
-    # Configure CORS on all routes.
-    for route in list(app.router.routes()):
-        if not isinstance(route.resource, web.StaticResource):
-            try:
-                cors.add(route)
-                LOGGER.info(f'Enabled CORS for {route.resource}')
-            except RuntimeError:
-                # Endpoint routes will re-occur in the list when they support multiple methods.
-                # Trying to overwrite the OPTIONS handler for an endpoint triggers a RuntimeError.
-                # This can be safely ignored.
-                LOGGER.debug(f'Skipped CORS for [{route.method}] {route.resource}')
 
     # service functions are intentionally synchronous
     # - web.run_app() assumes it is called from a synchronous context

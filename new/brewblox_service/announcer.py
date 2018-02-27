@@ -6,42 +6,44 @@ import logging
 from typing import Type
 from urllib.parse import urljoin
 
-from aiohttp import ClientSession, web
-from aiohttp.client_exceptions import ClientConnectorError
+from aiohttp import ClientSession, hdrs, web
 
 LOGGER = logging.getLogger(__name__)
 CREDENTIALS = {
     'username': 'admin',
     'password': 'admin'
 }
-ALL_METHODS = [
-    'GET',
-    'HEAD',
-    'POST',
-    'PUT',
-    'DELETE',
-    'CONNECT',
-    'OPTIONS',
-    'TRACE',
-    'PATCH'
-]
 
 
 async def create_proxy_spec(name: str, host: str, port: int) -> dict:
+    """Defines behavior for how the gateway should reverse proxy REST calls.
+
+    Example:
+        gateway url = http://gateway:1234
+        controller url = http://controlhost:5678
+        controller name = my_controller
+
+        The gateway forwards all paths starting with 'my_controller'.
+
+        Example call:
+        to gateway: http://gateway:1234/my_controller/api/doc
+        proxied to: http://controlhost:5678/my_controller/api/doc
+
+    """
     url = f'http://{host}:{port}'
 
     spec = {
         'name': name,
         'active': True,
         'proxy': {
-            # Strips 'listen_path'
-            'strip_path': True,
+            # listen path is part of actual endpoint
+            'strip_path': False,
             # Appends everything past 'listen_path'
             'append_path': True,
             # Alls calls that match this are forwarded
             'listen_path': f'/{name}/*',
             # HTTP methods of these types are forwarded
-            'methods': ALL_METHODS,
+            'methods': list(hdrs.METH_ALL),
             # Addresses to which requests are forwarded
             'upstreams': {
                 'balancing': 'roundrobin',
@@ -49,7 +51,7 @@ async def create_proxy_spec(name: str, host: str, port: int) -> dict:
             }
         },
         'health_check': {
-            'url': url + '/_service/status'
+            'url': f'{url}/{name}/_service/status'
         }
     }
 
@@ -76,7 +78,7 @@ async def announce(app: Type[web.Application]):
             spec = await create_proxy_spec(name, host, port)
             headers = await auth_header(session, gateway)
 
-            LOGGER.debug(f'announcing spec: {spec}')
+            LOGGER.debug(f'Announcing spec: {spec}')
 
             # try to unregister previous instance of API
             delete_url = urljoin(gateway, f'apis/{name}')
@@ -85,5 +87,7 @@ async def announce(app: Type[web.Application]):
             # register service
             await session.post(url, headers=headers, json=spec)
 
-        except ClientConnectorError as ex:
-            LOGGER.warn(f'failed to announce to gateway: {str(ex)}')
+            LOGGER.info(f'Announced to {url} as [{name}]')
+
+        except Exception as ex:
+            LOGGER.warn(f'Failed gateway announce: {str(ex)}')

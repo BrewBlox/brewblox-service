@@ -14,7 +14,7 @@ LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
 
 
-def init_app(app: Type[web.Application]):
+def setup(app: Type[web.Application]):
     app.router.add_routes(routes)
     app['simulator'] = SimulatorService()
 
@@ -76,7 +76,7 @@ async def get_config(request):
     """
     ---
     tags:
-    - simulator
+    - Simulator
     summary: Get current config.
     description: Get config currently used by simulator.
     operationId: simulator.config
@@ -92,7 +92,7 @@ async def post_config(request):
     """
     ---
     tags:
-    - simulator
+    - Simulator
     summary: Update config.
     description: Set new configuration to be returned by simulator.
     operationId: simulator.config
@@ -130,7 +130,7 @@ async def get_values(request):
     """
     ---
     tags:
-    - simulator
+    - Simulator
     summary: Get all config values.
     description: Get randomized state for all values currently in config.
     operationId: simulator.values
@@ -147,7 +147,7 @@ async def get_specific_value(request):
     """
     ---
     tags:
-    - simulator
+    - Simulator
     summary: Get all config values.
     description: Get randomized state for all values matching a specific identifier.
     operationId: simulator.values.id

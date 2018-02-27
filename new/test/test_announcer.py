@@ -5,6 +5,7 @@ Tests brewblox_service.announcer.py
 from brewblox_service import announcer
 from aiohttp import ClientSession
 from aioresponses import aioresponses
+from unittest.mock import ANY
 
 TESTED = announcer.__name__
 
@@ -16,17 +17,17 @@ async def test_create_proxy_spec(app):
         'name': 'test_name',
         'active': True,
         'proxy': {
-            'strip_path': True,
+            'strip_path': False,
             'append_path': True,
             'listen_path': '/test_name/*',
-            'methods': announcer.ALL_METHODS,
+            'methods': ANY,
             'upstreams': {
                 'balancing': 'roundrobin',
                 'targets': [{'target': 'http://localhost:1234'}]
             }
         },
         'health_check': {
-            'url': 'http://localhost:1234/_service/status'
+            'url': 'http://localhost:1234/test_name/_service/status'
         }
     }
 

@@ -4,7 +4,7 @@ Entry point for standalone brewblox_service.
 This will create the app, and run a simulator.
 """
 
-from brewblox_service import service, simulator
+from brewblox_service import events, service, simulator
 
 
 def main():
@@ -12,7 +12,11 @@ def main():
 
     # Add implementation-specific functionality
     # In this case: simulator
-    simulator.init_app(app)
+    simulator.setup(app)
+
+    # Event handling is optional
+    # It should be enabled explicitly by service implementations
+    events.setup(app)
 
     # Add all default endpoints, and announce service to gateway
     service.furnish(app)
