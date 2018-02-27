@@ -16,6 +16,20 @@ CREDENTIALS = {
 
 
 async def create_proxy_spec(name: str, host: str, port: int) -> dict:
+    """Defines behavior for how the gateway should reverse proxy REST calls.
+
+    Example:
+        gateway url = http://gateway:1234
+        controller url = http://controlhost:5678
+        controller name = my_controller
+
+        The gateway forwards all paths starting with 'my_controller'.
+
+        Example call:
+        to gateway: http://gateway:1234/my_controller/api/doc
+        proxied to: http://controlhost:5678/my_controller/api/doc
+
+    """
     url = f'http://{host}:{port}'
 
     spec = {
