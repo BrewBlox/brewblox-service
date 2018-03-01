@@ -14,7 +14,6 @@ from typing import Type
 import aiohttp_cors
 import aiohttp_swagger
 from aiohttp import web
-
 from brewblox_service import announcer
 
 LOGGER = logging.getLogger(__name__)
@@ -147,7 +146,6 @@ def furnish(app: Type[web.Application]):
                                   swagger_url=prefix + '/api/doc',
                                   description='',
                                   title='Brewblox Service',
-                                  api_version='0.3.0',
                                   contact='development@brewpi.com')
 
     for route in app.router.routes():

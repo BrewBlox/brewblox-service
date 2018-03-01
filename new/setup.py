@@ -3,7 +3,9 @@ from setuptools import setup, find_packages
 
 setup(
     name='brewblox-service',
-    version='0.3.1',
+    # version is inserted automatically by setuptools-git-version
+    version_format='{tag}.dev{commitcount}+{gitsha}',
+    setup_requires=['setuptools-git-version'],
     long_description=open('README.md').read(),
     url='https://github.com/BrewBlox/brewblox-service',
     author='BrewPi',
