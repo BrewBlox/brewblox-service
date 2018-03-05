@@ -27,5 +27,6 @@ setup(
         'aiohttp-swagger',
         'aio-pika',
     ],
+    python_requires='>=3.6',
     extras_require={'dev': ['tox']}
 )
