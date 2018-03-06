@@ -1,12 +1,24 @@
 language: python
 
-python:
-  - "3.6"
-
-install:
-  - pip install tox
-
-before_script: cd new
-
-script:
-  - tox
+jobs:
+  include:
+    -
+      stage: test
+      python: '3.6'
+      install: pip install tox
+      script: tox
+    -
+      stage: deploy
+      python: '3.6'
+      install: skip
+      script: skip
+      deploy:
+        before_deploy: 
+          - pip install bump2version
+          # Check whether current tag matches current package version
+          - python -c "assert '$(git describe --tags)' == '$(bump2version --dry-run --list minor | grep current_version | sed -r s,\"^.*=\",,)'"
+        provider: pypi
+        user: $PYPI_USER
+        password: $PYPI_PASSWORD
+        on:
+          tags: true
