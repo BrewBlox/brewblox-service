@@ -24,7 +24,6 @@ def app_config() -> dict:
         'name': 'test_app',
         'host': '0.0.0.0',
         'port': 1234,
-        'consul': 'http://consul:8500',
         'debug': False,
         'output': None,
     }
@@ -37,7 +36,6 @@ def sys_args(app_config) -> list:
         '--name', app_config['name'],
         '--host', app_config['host'],
         '--port', str(app_config['port']),
-        '--consul', app_config['consul'],
     ]
 
 

@@ -14,8 +14,6 @@ import aiohttp_cors
 import aiohttp_swagger
 from aiohttp import web
 
-from brewblox_service import discovery
-
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
 
@@ -81,9 +79,6 @@ def create_parser(default_name: str) -> Type[argparse.ArgumentParser]:
     argparser.add_argument('--debug',
                            help='Run the app in debug mode. [%(default)s]',
                            action='store_true')
-    argparser.add_argument('--consul',
-                           help='Consul service. Will be queried to find service addresses. [%(default)s]',
-                           default='http://consul:8500/')
     return argparser
 
 
@@ -109,8 +104,6 @@ def create_app(
 def furnish(app: Type[web.Application]):
     prefix = '/' + app['config']['name'].lstrip('/')
     app.router.add_routes(routes)
-
-    discovery.setup(app)
 
     # Configure default CORS settings.
     cors = aiohttp_cors.setup(app, defaults={

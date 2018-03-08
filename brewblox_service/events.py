@@ -24,7 +24,6 @@ import aio_pika
 from aio_pika import ExchangeType
 from aio_pika.queue import ExchangeType_
 from aiohttp import web
-from brewblox_service import discovery
 
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
@@ -33,7 +32,7 @@ EVENT_CALLBACK_ = Callable[['EventSubscription', str, Union[dict, str]], None]
 
 LISTENER_KEY = 'events.listener'
 PUBLISHER_KEY = 'events.publisher'
-EVENTBUS_FEATURE = 'eventbus'
+EVENTBUS_HOST = 'eventbus'
 
 
 def setup(app: Type[web.Application]):
@@ -116,8 +115,7 @@ class EventListener():
         app.on_cleanup.append(self._cleanup)
 
     async def _startup(self, app: Type[web.Application]):
-        eventbus_addr = await discovery.find_feature(app, EVENTBUS_FEATURE)
-        await self.start(app.loop, eventbus_addr['host'])
+        await self.start(app.loop)
 
     async def _cleanup(self, app: Type[web.Application]):
         await self.close()
@@ -127,7 +125,7 @@ class EventListener():
             LOGGER.info(f'Connected {self}')
             self._task = connection.loop.create_task(self._listen())
 
-    async def start(self, loop: Type[asyncio.BaseEventLoop], eventbus_host: str):
+    async def start(self, loop: Type[asyncio.BaseEventLoop]):
         # Initialize the async queue now we know which loop we're using
         self._pending = asyncio.Queue(loop=loop)
 
@@ -139,7 +137,7 @@ class EventListener():
 
         # Create the connection
         # We want to start listening it now, and whenever we reconnect
-        self._connection = await aio_pika.connect_robust(loop=loop, host=eventbus_host)
+        self._connection = await aio_pika.connect_robust(loop=loop, host=EVENTBUS_HOST)
         self._connection.add_reconnect_callback(self._on_connected)
         self._on_connected(self._connection)
 
@@ -222,18 +220,17 @@ class EventPublisher():
         app.on_cleanup.append(self._cleanup)
 
     async def _startup(self, app: Type[web.Application]):
-        eventbus_addr = await discovery.find_feature(app, EVENTBUS_FEATURE)
-        await self.start(app.loop, eventbus_addr['host'])
+        await self.start(app.loop)
 
     async def _cleanup(self, app: Type[web.Application]):
         await self.close()
 
-    async def start(self, loop: Type[asyncio.BaseEventLoop], eventbus_host: str):
+    async def start(self, loop: Type[asyncio.BaseEventLoop]):
         def _on_connected(connection):
             if not connection.is_closed:
                 LOGGER.info(f'Connected {self}')
 
-        self._connection = await aio_pika.connect_robust(loop=loop, host=eventbus_host)
+        self._connection = await aio_pika.connect_robust(loop=loop, host=EVENTBUS_HOST)
         self._connection.add_reconnect_callback(_on_connected)
         _on_connected(self._connection)
 

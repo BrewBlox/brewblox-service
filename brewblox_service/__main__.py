@@ -18,7 +18,7 @@ def main():
     # It should be enabled explicitly by service implementations
     events.setup(app)
 
-    # Add all default endpoints, and announce service to gateway
+    # Add all default endpoints
     service.furnish(app)
 
     # service.run() will start serving clients async
