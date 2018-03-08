@@ -17,7 +17,7 @@ TESTED = events.__name__
 
 def set_connect_func(mocker, closed: bool):
 
-    async def mocked_connect_robust(loop=None):
+    async def mocked_connect_robust(loop=None, host=None):
         conn_mock = AsyncMock(spec=aio_pika.robust_connection.RobustConnection)
         conn_mock.loop = loop
         conn_mock.is_closed = closed
@@ -117,7 +117,7 @@ async def test_online_listener(app, client, mocker):
     await listener.close()
 
     assert sub in listener._pending_pre_async
-    await listener.start(app.loop)
+    await listener.start(app.loop, 'localhost')
     assert listener._pending_pre_async is None
 
     pending_subs = listener._pending.qsize()
@@ -134,12 +134,12 @@ async def test_closed_listener(app, client, mocker):
     set_connect_func(mocker, closed=True)
 
     listener = events.EventListener()
-    await listener.start(app.loop)
+    await listener.start(app.loop, 'localhost')
 
 
 async def test_disconnect_listener(app, client, mocker):
     listener = events.EventListener()
-    await listener.start(app.loop)
+    await listener.start(app.loop, 'localhost')
 
     # Task should be started
     assert listener._task
@@ -165,7 +165,7 @@ async def test_online_publisher(app, client, mocker):
         events.EventPublisher(app)
 
     publisher = events.EventPublisher()
-    await publisher.start(app.loop)
+    await publisher.start(app.loop, 'localhost')
 
     await publisher.publish('exchange', 'key', message=dict(key='val'))
     await publisher.publish('exchange', 'key', message=dict(key='val'))
@@ -175,7 +175,7 @@ async def test_closed_publisher(app, client, mocker):
     set_connect_func(mocker, closed=True)
 
     publisher = events.EventPublisher()
-    await publisher.start(app.loop)
+    await publisher.start(app.loop, 'localhost')
 
 
 async def test_publish_endpoint(app, client, mocker):

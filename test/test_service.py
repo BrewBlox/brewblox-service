@@ -5,7 +5,6 @@ Test functions in brewblox_service.service.py
 from unittest.mock import call
 
 import pytest
-from asynctest import CoroutineMock
 
 from brewblox_service import service
 
@@ -14,7 +13,6 @@ TESTED = service.__name__
 
 @pytest.fixture
 async def app(app, mocker):
-    mocker.patch(TESTED + '.announcer.announce', CoroutineMock())
     app.router.add_static(prefix='/static', path='/usr')
     service.furnish(app)
     return app
@@ -27,7 +25,7 @@ def test_parse_args():
     assert args.port == 5000
     assert not args.debug
     assert not args.output
-    assert args.host == 'localhost'
+    assert args.host == '0.0.0.0'
     assert args.name == 'brewblox'
 
     # test host
@@ -116,9 +114,6 @@ def test_create_w_parser(sys_args, app_config, mocker):
 
 
 async def test_furnish(app, client):
-    # mocked in app fixture
-    assert service.announcer.announce.call_count == 1
-
     res = await client.get('/test_app/_service/status')
     assert res.status == 200
     assert await res.json() == {'status': 'ok'}
@@ -129,4 +124,4 @@ def test_run(app, mocker, loop):
 
     service.run(app)
 
-    run_mock.assert_called_once_with(app, host='localhost', port=1234)
+    run_mock.assert_called_once_with(app, host='0.0.0.0', port=1234)
