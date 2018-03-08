@@ -17,7 +17,7 @@ TESTED = events.__name__
 
 def set_connect_func(mocker, closed: bool):
 
-    async def mocked_connect_robust(loop=None):
+    async def mocked_connect_robust(loop=None, host=None):
         conn_mock = AsyncMock(spec=aio_pika.robust_connection.RobustConnection)
         conn_mock.loop = loop
         conn_mock.is_closed = closed

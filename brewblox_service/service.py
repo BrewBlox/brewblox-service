@@ -5,7 +5,6 @@ Responsible for parsing user configuration, and creating top-level objects.
 """
 
 import argparse
-import asyncio
 import logging
 import sys  # noqa
 from logging.handlers import TimedRotatingFileHandler
@@ -14,8 +13,6 @@ from typing import Type, List
 import aiohttp_cors
 import aiohttp_swagger
 from aiohttp import web
-
-from brewblox_service import announcer
 
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
@@ -69,7 +66,7 @@ def create_parser(default_name: str) -> Type[argparse.ArgumentParser]:
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-H', '--host',
                            help='Host to which the app binds. [%(default)s]',
-                           default='localhost')
+                           default='0.0.0.0')
     argparser.add_argument('-p', '--port',
                            help='Port to which the app binds. [%(default)s]',
                            default=5000,
@@ -82,9 +79,6 @@ def create_parser(default_name: str) -> Type[argparse.ArgumentParser]:
     argparser.add_argument('--debug',
                            help='Run the app in debug mode. [%(default)s]',
                            action='store_true')
-    argparser.add_argument('-g', '--gateway',
-                           help='Gateway URL. Services will be announced here. [%(default)s]',
-                           default='http://localhost:8081')
     return argparser
 
 
@@ -150,14 +144,6 @@ def furnish(app: Type[web.Application]):
 
     for route in app.router.routes():
         LOGGER.info(f'Registered [{route.method}] {route.resource}')
-
-    # service functions are intentionally synchronous
-    # - web.run_app() assumes it is called from a synchronous context
-    # - pre-start performance / concurrency is not relevant
-    #
-    # announcer.announce() is technically async (it uses aiohttp client)
-    # asyncio.ensure_future() correctly handles desired behavior (async call in sync function)
-    asyncio.ensure_future(announcer.announce(app))
 
 
 def run(app: Type[web.Application]):

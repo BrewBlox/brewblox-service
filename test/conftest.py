@@ -22,9 +22,8 @@ def log_enabled():
 def app_config() -> dict:
     return {
         'name': 'test_app',
-        'host': 'localhost',
+        'host': '0.0.0.0',
         'port': 1234,
-        'gateway': 'http://gatewayaddr:1234',
         'debug': False,
         'output': None,
     }
@@ -37,7 +36,6 @@ def sys_args(app_config) -> list:
         '--name', app_config['name'],
         '--host', app_config['host'],
         '--port', str(app_config['port']),
-        '--gateway', app_config['gateway'],
     ]
 
 
