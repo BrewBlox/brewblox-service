@@ -9,7 +9,7 @@ import asyncio
 import logging
 import sys  # noqa
 from logging.handlers import TimedRotatingFileHandler
-from typing import Type
+from typing import Type, List
 
 import aiohttp_cors
 import aiohttp_swagger
@@ -65,7 +65,7 @@ def _init_logging(args: Type[argparse.Namespace]):
         logging.getLogger('asyncio').setLevel(logging.CRITICAL)
 
 
-def parse_args(sys_args: list=None) -> Type[argparse.Namespace]:
+def create_parser(default_name: str) -> Type[argparse.ArgumentParser]:
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-H', '--host',
                            help='Host to which the app binds. [%(default)s]',
@@ -77,35 +77,33 @@ def parse_args(sys_args: list=None) -> Type[argparse.Namespace]:
     argparser.add_argument('-o', '--output',
                            help='Logging output. [%(default)s]')
     argparser.add_argument('-n', '--name',
-                           help='Custom service name. This will be used as prefix in the gateway. [%(default)s]',
-                           default='brewblox')
+                           help='Service name. This will be used as prefix for all endpoints. [%(default)s]',
+                           default=default_name)
     argparser.add_argument('--debug',
                            help='Run the app in debug mode. [%(default)s]',
                            action='store_true')
     argparser.add_argument('-g', '--gateway',
                            help='Gateway URL. Services will be announced here. [%(default)s]',
                            default='http://localhost:8081')
-    return argparser.parse_args(sys_args)
+    return argparser
 
 
-def create(args: Type[argparse.Namespace]=None) -> Type[web.Application]:
-    if args is None:
-        # parse system args
-        args = parse_args()
+def create_app(
+        default_name: str=None,
+        parser: Type[argparse.ArgumentParser]=None,
+        raw_args: List[str]=None
+) -> Type[web.Application]:
 
+    if parser is None:
+        assert default_name, 'Default service name is required'
+        parser = create_parser(default_name)
+
+    args = parser.parse_args(raw_args)
     _init_logging(args)
-
-    config = {
-        'name': args.name,
-        'host': args.host,
-        'port': args.port,
-        'gateway': args.gateway,
-        'debug': args.debug,
-    }
 
     LOGGER.info(f'Creating [{args.name}] application')
     app = web.Application(debug=args.debug)
-    app['config'] = config
+    app['config'] = vars(args)
     return app
 
 
