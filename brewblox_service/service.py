@@ -15,7 +15,7 @@ import aiohttp_cors
 import aiohttp_swagger
 from aiohttp import web
 
-from brewblox_service import announcer
+from brewblox_service import announcer, discovery
 
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
@@ -112,6 +112,8 @@ def create(args: Type[argparse.Namespace]=None) -> Type[web.Application]:
 def furnish(app: Type[web.Application]):
     prefix = '/' + app['config']['name'].lstrip('/')
     app.router.add_routes(routes)
+
+    discovery.setup(app)
 
     # Configure default CORS settings.
     cors = aiohttp_cors.setup(app, defaults={
