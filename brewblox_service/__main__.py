@@ -8,7 +8,7 @@ from brewblox_service import events, service, simulator
 
 
 def main():
-    app = service.create()
+    app = service.create_app(default_name='simulator')
 
     # Add implementation-specific functionality
     # In this case: simulator
