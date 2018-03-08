@@ -9,7 +9,7 @@ TESTED = main.__name__
 
 
 def test_main(loop, mocker):
-    create_mock = mocker.patch(TESTED + '.service.create')
+    create_mock = mocker.patch(TESTED + '.service.create_app')
     furnish_mock = mocker.patch(TESTED + '.service.furnish')
     run_mock = mocker.patch(TESTED + '.service.run')
     events_mock = mocker.patch(TESTED + '.events.setup')
@@ -17,7 +17,7 @@ def test_main(loop, mocker):
 
     main.main()
 
-    assert create_mock.call_count == 1
+    create_mock.assert_called_once_with(default_name='simulator')
     furnish_mock.assert_called_once_with(app_mock)
     run_mock.assert_called_once_with(app_mock)
     events_mock.assert_called_once_with(app_mock)
