@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='brewblox-service',
-    version='0.6.0',
+    version='0.6.1',
     long_description=open('README.md').read(),
     url='https://github.com/BrewBlox/brewblox-service',
     author='BrewPi',
