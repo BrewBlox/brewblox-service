@@ -4,10 +4,18 @@ python: '3.6'
 install: pip install tox
 script: tox
 deploy:
-  before_deploy: 
-    - pip install bump2version
-    # Check whether current tag matches current package version
-    - python -c "assert '$(git describe --tags)' == '$(bump2version --dry-run --list minor | grep current_version | sed -r s,\"^.*=\",,)'"
+  # Checks whether current version matches current tag
+  before_deploy: |
+    pip install bump2version;
+    python -c "assert '$(git describe --tags)' == '$(bump2version --dry-run --list minor | grep current_version | sed -r s,\"^.*=\",,)'"
+  # Triggers building Docker containers for both current tag, and "latest"
+  after_deploy: >
+    curl -H "Content-Type: application/json"
+    --data '{"docker_tag": "latest"}'
+    -X POST https://registry.hub.docker.com/u/brewblox/brewblox-service/trigger/$DOCKER_TOKEN/;
+    curl -H "Content-Type: application/json"
+    --data '{"source_type": "Tag", "source_name": "$(git describe --tags)"}'
+    -X POST https://registry.hub.docker.com/u/brewblox/brewblox-service/trigger/$DOCKER_TOKEN/;
   provider: pypi
   user: $PYPI_USER
   password: $PYPI_PASSWORD
