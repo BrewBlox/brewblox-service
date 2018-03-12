@@ -3,10 +3,6 @@ language: python
 python: '3.6'
 install: pip install tox
 script: tox
-# Checks whether current version matches current tag
-before_deploy: |
-  pip install bump2version;
-  python -c "assert '$(git describe --tags)' == '$(bump2version --dry-run --list minor | grep current_version | sed -r s,\"^.*=\",,)'"
 deploy:
   provider: pypi
   user: $PYPI_USER
