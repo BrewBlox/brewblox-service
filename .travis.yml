@@ -17,5 +17,5 @@ after_deploy: >
   -X POST https://registry.hub.docker.com/u/brewblox/brewblox-service/trigger/$DOCKER_TOKEN/
   &
   curl -H "Content-Type: application/json"
-  --data '{"source_type": "Tag", "source_name": "$(git describe --tags)"}'
+  --data '{"source_type": "Tag", "source_name": "$TRAVIS_TAG"}'
   -X POST https://registry.hub.docker.com/u/brewblox/brewblox-service/trigger/$DOCKER_TOKEN/
