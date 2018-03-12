@@ -10,8 +10,4 @@ deploy:
   skip_cleanup: true
   on:
     tags: true
-# Triggers building Docker containers for both current tag, and "latest"
-after_deploy: >
-  curl -H "Content-Type: application/json"
-  --data '{"docker_tag": "latest"}'
-  -X POST https://registry.hub.docker.com/u/brewblox/brewblox-service/trigger/$DOCKER_TOKEN/
+after_deploy: ./deploy_docker.sh
