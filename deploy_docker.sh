@@ -14,8 +14,8 @@ docker build -t $BASE docker/
 docker tag $BASE $BASE:$PREFIX$LATEST
 docker push $BASE:$PREFIX$LATEST
 
-# If we're in a Travis build with a tag: push a tagged image
-if [ "$TRAVIS_TAG" != ""]; then
-    docker tag $BASE $BASE:$PREFIX$TRAVIS_TAG
-    docker push $BASE:$PREFIX$TRAVIS_TAG
+# If we're in a Travis build: push a specific image
+if [ "$CI" == "true" ]; then
+    docker tag $BASE $BASE:$PREFIX$TRAVIS_BRANCH
+    docker push $BASE:$PREFIX$TRAVIS_BRANCH
 fi
