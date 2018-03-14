@@ -39,5 +39,5 @@ deploy:
     skip_cleanup: true
     on:
       tags: false
-      repo: brewblox/brewblox-service
+      repo: BrewBlox/brewblox-service
       all_branches: true
