@@ -7,6 +7,6 @@ COPY ./Dockerfile ./pkg*/* /pkg/
 
 EXPOSE 5000
 
-RUN pip3 install brewblox-service -f /pkg/
+RUN pip3 install -U brewblox-service -f /pkg/
 
 ENTRYPOINT ["python3", "-m", "brewblox_service"]
