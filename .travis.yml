@@ -23,7 +23,7 @@ deploy:
 
   # Deploy "latest" and version tag to Docker Hub on tagged commits
   - provider: script
-    script: >
+    script: >-
       python3 ./deploy_docker.py 
       --user "$DOCKER_USER"
       --password "$DOCKER_PASSWORD"
@@ -35,7 +35,7 @@ deploy:
 
   # Deploy branch to Docker Hub on any push to an upstream branch
   - provider: script
-    script: >
+    script: >-
       python3 ./deploy_docker.py 
       --user "$DOCKER_USER"
       --password "$DOCKER_PASSWORD"
