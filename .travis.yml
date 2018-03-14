@@ -3,9 +3,9 @@ language: python
 python: '3.6'
 install: pip install tox docker
 script: tox
-before_deploy: |
+before_deploy: >
   mkdir -p ./docker/pkg
-  cp .tox/dist/* ./docker/pkg/
+  && cp .tox/dist/* ./docker/pkg/
 deploy:
 
   # Deploy to PyPi on tagged commits
@@ -35,8 +35,7 @@ deploy:
       --user "$DOCKER_USER"
       --password "$DOCKER_PASSWORD"
       --name brewblox/brewblox-service
-      # Replace / in branch name with -
-      --tags $TRAVIS_BRANCH
+      --tags "$TRAVIS_BRANCH"
     skip_cleanup: true
     on:
       tags: false
