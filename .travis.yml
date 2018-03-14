@@ -36,7 +36,7 @@ deploy:
       --password "$DOCKER_PASSWORD"
       --name brewblox/brewblox-service
       # Replace / in branch name with -
-      --tags ${TRAVIS_BRANCH////-}
+      --tags $TRAVIS_BRANCH
     skip_cleanup: true
     on:
       tags: false

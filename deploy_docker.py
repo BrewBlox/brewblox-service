@@ -2,6 +2,7 @@
 
 import argparse
 import docker
+import re
 
 
 def parse_args(sys_args: list=None):
@@ -41,7 +42,10 @@ def push(client, image, args):
         print('No tags specified - doing nothing')
 
     for tag in args.tags:
+        # Filter out illegal tag characters
+        tag = re.sub('[/_:]', '-', tag)
         print(f'Pushing {args.name}:{tag}')
+
         image.tag(repository=args.name, tag=tag)
         logs = client.images.push(repository=args.name, tag=tag)
         print(logs)
@@ -49,6 +53,7 @@ def push(client, image, args):
 
 def main(sys_args: list=None):
     args = parse_args(sys_args)
+    print(args)
     client = docker.from_env()
 
     login(client, args)
