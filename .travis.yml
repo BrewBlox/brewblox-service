@@ -6,6 +6,7 @@ script: tox
 before_deploy: >
   mkdir -p ./docker/pkg
   && cp .tox/dist/* ./docker/pkg/
+  && ls ./docker/pkg/
 deploy:
 
   # Deploy to PyPi on tagged commits
