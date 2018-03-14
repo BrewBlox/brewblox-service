@@ -1,17 +1,43 @@
 language: python
 
 python: '3.6'
-install: pip install tox
+install: pip install tox docker
 script: tox
+before_deploy: |
+  mkdir -p ./docker/pkg
+  cp .tox/dist/* ./docker/pkg/
 deploy:
-  provider: pypi
-  user: $PYPI_USER
-  password: $PYPI_PASSWORD
-  skip_cleanup: true
-  on:
-    tags: true
-# Triggers building Docker containers for both current tag, and "latest"
-after_deploy: >
-  curl -H "Content-Type: application/json"
-  --data '{"docker_tag": "latest"}'
-  -X POST https://registry.hub.docker.com/u/brewblox/brewblox-service/trigger/$DOCKER_TOKEN/
+
+  # Deploy to PyPi on tagged commits
+  - provider: pypi
+    user: $PYPI_USER
+    password: $PYPI_PASSWORD
+    skip_cleanup: true
+    on:
+      tags: true
+
+  # Deploy "latest" and version tag to Docker Hub on tagged commits
+  - provider: script
+    script: >
+      python3 ./deploy_docker.py 
+      --user "$DOCKER_USER"
+      --password "$DOCKER_PASSWORD"
+      --name brewblox/brewblox-service
+      --tags latest $(git describe --tags)
+    skip_cleanup: true
+    on:
+      tags: true
+
+  # Deploy branch to Docker Hub on any push to an upstream branch
+  - provider: script
+    script: >
+      python3 ./deploy_docker.py 
+      --user "$DOCKER_USER"
+      --password "$DOCKER_PASSWORD"
+      --name brewblox/brewblox-service
+      --tags $TRAVIS_BRANCH
+    skip_cleanup: true
+    on:
+      tags: false
+      repo: brewblox/brewblox-service
+      all_branches: true
