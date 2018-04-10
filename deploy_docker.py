@@ -2,6 +2,7 @@
 
 import argparse
 import docker
+import json
 import re
 
 
@@ -17,22 +18,37 @@ def parse_args(sys_args: list=None):
 
 
 def login(client, args):
-    print('==== Logging in ====')
-    client.login(username=args.user, password=args.password)
+    if args.user:
+        print('==== Logging in ====')
+        client.login(username=args.user, password=args.password)
 
 
 def build(client, args):
     print('==== Building ====')
-    image, logs = client.images.build(
+
+    # We're using the low-level API client to get a continuous stream of messages
+    tag_name = args.name + ':temp'
+    docker_client = docker.APIClient()
+
+    generator = docker_client.build(
         path=args.image,
-        tag=args.name,
-        nocache=args.no_cache,
-    )
+        tag=tag_name,
+        rm=True,
+        nocache=args.no_cache)
 
-    for line in logs:
-        print(*[str(l).rstrip() for l in line.values()])
+    while True:
+        try:
+            output = next(generator).rstrip()
+            json_output = json.loads(output)
+            if 'stream' in json_output:
+                print(json_output['stream'].rstrip())
+        except StopIteration:
+            print('Docker image build complete.')
+            break
+        except ValueError:
+            print(f'Error parsing output from docker image build: {output}')
 
-    return image
+    return client.images.get(tag_name)
 
 
 def push(client, image, args):
