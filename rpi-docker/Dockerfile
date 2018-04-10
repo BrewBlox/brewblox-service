@@ -7,4 +7,4 @@ EXPOSE 5000
 
 RUN pip3 install -U brewblox-service -f /pkg/
 
-ENTRYPOINT ["python3", "-m", "brewblox-service"]
+ENTRYPOINT ["python3", "-m", "brewblox_service"]
