@@ -68,6 +68,3 @@ target/
 
 # pytest
 .pytest_cache/
-
-# Python packages for building docker
-docker/pkg/*
