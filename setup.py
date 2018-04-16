@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='brewblox-service',
-    version='0.7.0',
+    use_scm_version={'local_scheme': lambda v: ''},
     long_description=open('README.md').read(),
     url='https://github.com/BrewBlox/brewblox-service',
     author='BrewPi',
@@ -28,5 +28,6 @@ setup(
         'aio-pika',
     ],
     python_requires='>=3.6',
-    extras_require={'dev': ['tox']}
+    extras_require={'dev': ['tox']},
+    setup_requires=['setuptools_scm']
 )

@@ -32,6 +32,16 @@ deploy:
     on:
       tags: true
 
+  # Deploy dev version to PyPi on any push to an upstream branch
+  - provider: pypi
+    user: $PYPI_USER
+    password: $PYPI_PASSWORD
+    skip_cleanup: true
+    on:
+      tags: false
+      repo: $GITHUB_REPO
+      all_branches: true
+
   # Deploy "latest" and version tag to Docker Hub on tagged commits
   - provider: script
     script:
