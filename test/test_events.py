@@ -47,6 +47,7 @@ def set_connect_func(mocker, closed: bool):
 async def app(app, mocker, loop):
     """App with events enabled"""
     set_connect_func(mocker, closed=False)
+    mocker.patch(TESTED + '._wait_host_resolved', CoroutineMock())
 
     events.setup(app)
     return app
