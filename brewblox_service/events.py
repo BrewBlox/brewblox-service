@@ -15,8 +15,10 @@ Example use:
 """
 
 import asyncio
+import errno
 import json
 import logging
+import socket
 from concurrent.futures import CancelledError
 from typing import Callable, Type, Union
 
@@ -24,6 +26,7 @@ import aio_pika
 from aio_pika import ExchangeType
 from aio_pika.queue import ExchangeType_
 from aiohttp import web
+from abc import ABC, abstractmethod
 
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
@@ -33,6 +36,7 @@ EVENT_CALLBACK_ = Callable[['EventSubscription', str, Union[dict, str]], None]
 LISTENER_KEY = 'events.listener'
 PUBLISHER_KEY = 'events.publisher'
 EVENTBUS_HOST = 'eventbus'
+EVENTBUS_PORT = 5672
 
 
 def setup(app: Type[web.Application]):
@@ -51,6 +55,30 @@ def get_publisher(app: Type[web.Application]) -> 'EventPublisher':
 
 def _default_on_message(queue: Type[aio_pika.Queue], key: str, message: Union[dict, str]):
     LOGGER.info(f'Unhandled event: queue={queue}, key={key} message={message}')
+
+
+async def _wait_host_resolved(loop: asyncio.BaseEventLoop):  # pragma: no cover
+    """
+    Dirty patch: use a non-blocking getaddrinfo to wait until host IP can be determined.
+    Reference: https://github.com/mosquito/aio-pika/issues/124
+    """
+    first_attempt = True
+    while True:
+        try:
+            await loop.getaddrinfo(host=EVENTBUS_HOST, port=EVENTBUS_PORT,
+                                   family=0, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP)
+            break
+        except OSError as error:
+            if error.errno == errno.EINTR:
+                # Not actually an error, but still need to try again
+                continue
+
+            if first_attempt:
+                LOGGER.warn(f'Failed to resolve host "{EVENTBUS_HOST}", will keep trying...')
+                first_attempt = False
+
+            await asyncio.sleep(1)
+            continue
 
 
 class EventSubscription():
@@ -95,8 +123,37 @@ class EventSubscription():
             LOGGER.error(f'Exception relaying message in {self}: {ex}')
 
 
-class EventListener():
-    def __init__(self, app: Type[web.Application]=None):
+class EventHandler(ABC):
+    def __init__(self, app: web.Application=None):
+        if app:
+            self.setup(app)
+
+    def setup(self, app):
+        app.on_startup.append(self._startup)
+        app.on_cleanup.append(self._cleanup)
+
+    async def _startup(self, app: web.Application):
+        # FIXME(Bob): Temporary solution: schedule, but don't await start
+        # This avoids app startup waiting for DNS resolution
+        app.loop.create_task(self.start(app.loop))
+        # await self.start(app.loop)
+
+    async def _cleanup(self, app: web.Application):
+        await self.close()
+
+    @abstractmethod
+    async def start(loop: asyncio.BaseEventLoop):
+        pass  # pragma: no cover
+
+    @abstractmethod
+    async def close():
+        pass  # pragma: no cover
+
+
+class EventListener(EventHandler):
+    def __init__(self, app: web.Application=None):
+        super().__init__(app)
+
         # Asyncio queues need a context loop
         # We'll initialize self._pending when we have one
         self._pending_pre_async = []
@@ -104,28 +161,15 @@ class EventListener():
         self._connection = None
         self._task = None
 
-        if app:
-            self.setup(app)
-
     def __str__(self):
         return f'<{type(self).__name__} {self._connection}>'
-
-    def setup(self, app):
-        app.on_startup.append(self._startup)
-        app.on_cleanup.append(self._cleanup)
-
-    async def _startup(self, app: Type[web.Application]):
-        await self.start(app.loop)
-
-    async def _cleanup(self, app: Type[web.Application]):
-        await self.close()
 
     def _on_connected(self, connection):
         if not connection.is_closed:
             LOGGER.info(f'Connected {self}')
             self._task = connection.loop.create_task(self._listen())
 
-    async def start(self, loop: Type[asyncio.BaseEventLoop]):
+    async def start(self, loop: asyncio.BaseEventLoop):
         # Initialize the async queue now we know which loop we're using
         self._pending = asyncio.Queue(loop=loop)
 
@@ -134,6 +178,9 @@ class EventListener():
 
         # We won't be needing this anymore
         self._pending_pre_async = None
+
+        # TODO(Bob): temporary fix for aio-pika using blocking getaddrinfo
+        await _wait_host_resolved(loop)
 
         # Create the connection
         # We want to start listening it now, and whenever we reconnect
@@ -204,31 +251,23 @@ class EventListener():
             LOGGER.info(f'Cancelled {self}')
 
 
-class EventPublisher():
+class EventPublisher(EventHandler):
     def __init__(self, app: Type[web.Application]=None):
+        super().__init__(app)
+
         self._connection = None
         self._channel = None
 
-        if app:
-            self.setup(app)
-
     def __str__(self):
         return f'<{type(self).__name__} {self._connection}>'
-
-    def setup(self, app):
-        app.on_startup.append(self._startup)
-        app.on_cleanup.append(self._cleanup)
-
-    async def _startup(self, app: Type[web.Application]):
-        await self.start(app.loop)
-
-    async def _cleanup(self, app: Type[web.Application]):
-        await self.close()
 
     async def start(self, loop: Type[asyncio.BaseEventLoop]):
         def _on_connected(connection):
             if not connection.is_closed:
                 LOGGER.info(f'Connected {self}')
+
+        # TODO(Bob): temporary fix for aio-pika using blocking getaddrinfo
+        await _wait_host_resolved(loop)
 
         self._connection = await aio_pika.connect_robust(loop=loop, host=EVENTBUS_HOST)
         self._connection.add_reconnect_callback(_on_connected)
