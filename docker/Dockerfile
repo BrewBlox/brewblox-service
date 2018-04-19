@@ -5,7 +5,8 @@ COPY ./pkg/* /pkg/
 
 EXPOSE 5000
 
-RUN pip3 install -U --pre brewblox-service -f /pkg/
-RUN pip3 show brewblox-service
+RUN pip3 install /pkg/* || true \
+    && pip3 install brewblox-service \
+    && pip3 show brewblox-service
 
 ENTRYPOINT ["python3", "-m", "brewblox_service"]
