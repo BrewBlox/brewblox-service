@@ -26,7 +26,7 @@ import aio_pika
 from aio_pika import ExchangeType
 from aio_pika.queue import ExchangeType_
 from aiohttp import web
-from abc import ABC, abstractmethod
+from brewblox_service.handler import ServiceHandler
 
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
@@ -123,34 +123,7 @@ class EventSubscription():
             LOGGER.error(f'Exception relaying message in {self}: {ex}')
 
 
-class EventHandler(ABC):
-    def __init__(self, app: web.Application=None):
-        if app:
-            self.setup(app)
-
-    def setup(self, app):
-        app.on_startup.append(self._startup)
-        app.on_cleanup.append(self._cleanup)
-
-    async def _startup(self, app: web.Application):
-        # FIXME(Bob): Temporary solution: schedule, but don't await start
-        # This avoids app startup waiting for DNS resolution
-        app.loop.create_task(self.start(app.loop))
-        # await self.start(app.loop)
-
-    async def _cleanup(self, app: web.Application):
-        await self.close()
-
-    @abstractmethod
-    async def start(loop: asyncio.BaseEventLoop):
-        pass  # pragma: no cover
-
-    @abstractmethod
-    async def close():
-        pass  # pragma: no cover
-
-
-class EventListener(EventHandler):
+class EventListener(ServiceHandler):
     def __init__(self, app: web.Application=None):
         super().__init__(app)
 
@@ -251,7 +224,7 @@ class EventListener(EventHandler):
             LOGGER.info(f'Cancelled {self}')
 
 
-class EventPublisher(EventHandler):
+class EventPublisher(ServiceHandler):
     def __init__(self, app: Type[web.Application]=None):
         super().__init__(app)
 
