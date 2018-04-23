@@ -23,19 +23,20 @@ from concurrent.futures import CancelledError
 from typing import Callable, Type, Union
 
 import aio_pika
-from aio_pika import ExchangeType
-from aio_pika.queue import ExchangeType_
 from aiohttp import web
 from brewblox_service.handler import ServiceHandler
+
+import aioamqp
 
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
 
 EVENT_CALLBACK_ = Callable[['EventSubscription', str, Union[dict, str]], None]
+ExchangeType_ = Type[str]
 
 LISTENER_KEY = 'events.listener'
 PUBLISHER_KEY = 'events.publisher'
-EVENTBUS_HOST = 'eventbus'
+EVENTBUS_HOST = 'localhost'
 EVENTBUS_PORT = 5672
 
 
@@ -53,7 +54,7 @@ def get_publisher(app: Type[web.Application]) -> 'EventPublisher':
     return app[PUBLISHER_KEY]
 
 
-def _default_on_message(queue: Type[aio_pika.Queue], key: str, message: Union[dict, str]):
+async def _default_on_message(queue: Type[aio_pika.Queue], key: str, message: Union[dict, str]):
     LOGGER.info(f'Unhandled event: queue={queue}, key={key} message={message}')
 
 
@@ -85,7 +86,7 @@ class EventSubscription():
     def __init__(self,
                  exchange_name: str,
                  routing: str,
-                 exchange_type: ExchangeType_=ExchangeType.TOPIC,
+                 exchange_type: ExchangeType_=aio_pika.ExchangeType.TOPIC,
                  on_message: EVENT_CALLBACK_=None):
         self._routing = routing
         self._exchange_name = exchange_name
@@ -177,7 +178,7 @@ class EventListener(ServiceHandler):
     def subscribe(self,
                   exchange_name: str,
                   routing: str,
-                  exchange_type: ExchangeType_=ExchangeType.TOPIC,
+                  exchange_type: ExchangeType_=aio_pika.ExchangeType.TOPIC,
                   on_message: EVENT_CALLBACK_=None):
         """Adds a new event subscription to the listener.
 
@@ -225,57 +226,63 @@ class EventListener(ServiceHandler):
 
 
 class EventPublisher(ServiceHandler):
-    def __init__(self, app: Type[web.Application]=None):
+    def __init__(self, app: web.Application=None, host: str=EVENTBUS_HOST):
         super().__init__(app)
 
-        self._connection = None
-        self._channel = None
+        self._host: str = host
+        self._transport = None
+        self._protocol: aioamqp.AmqpProtocol = None
+        self._channel: aioamqp.channel.Channel = None
 
     def __str__(self):
-        return f'<{type(self).__name__} {self._connection}>'
+        return f'<{type(self).__name__} {self._host}>'
 
-    async def start(self, loop: Type[asyncio.BaseEventLoop]):
-        def _on_connected(connection):
-            if not connection.is_closed:
-                LOGGER.info(f'Connected {self}')
+    async def start(self, loop: asyncio.BaseEventLoop):
+        self._loop = loop
 
-        # TODO(Bob): temporary fix for aio-pika using blocking getaddrinfo
-        await _wait_host_resolved(loop)
-
-        self._connection = await aio_pika.connect_robust(loop=loop, host=EVENTBUS_HOST)
-        self._connection.add_reconnect_callback(_on_connected)
-        _on_connected(self._connection)
+        self._transport, self._protocol = await aioamqp.connect(
+            host=self._host,
+            loop=self._loop
+        )
 
     async def close(self):
         LOGGER.info(f'Closing {self}')
-        if self._connection and not self._connection.is_closed:
-            await self._connection.close()
+
+        if self._protocol:
+            await self._protocol.close()
+            self._protocol = None
+            self._channel = None
+
+        if self._transport:
+            self._transport.close()
+            self._protocol = None
 
     async def publish(self,
                       exchange: str,
                       routing: str,
                       message: Union[str, dict]='',
-                      exchange_type: ExchangeType_=ExchangeType.TOPIC):
+                      exchange_type: ExchangeType_='topic'):
+        assert self._protocol, 'No connection available'
+        await self._protocol.ensure_open()
 
-        # Makes for a more readable error in case of closed connections
-        if not self._connection or self._connection.is_closed:
-            raise ConnectionRefusedError(
-                f'No event bus connection available for {self._connection}')
+        if not self._channel:
+            self._channel = await self._protocol.channel()
+
+        if not self._channel.is_open:
+            await self._channel.open()
 
         # json.dumps() also correctly handles strings
         data = json.dumps(message).encode()
 
-        if not self._channel:
-            self._channel = await self._connection.channel()
+        await self._channel.exchange_declare(
+            exchange_name=exchange,
+            type_name=exchange_type,
+            auto_delete=True
+        )
 
-        exchange = await self._channel.declare_exchange(
-            exchange,
-            exchange_type,
-            auto_delete=True)
-
-        # Push it over the line
-        await exchange.publish(
-            aio_pika.Message(data),
+        await self._channel.basic_publish(
+            payload=data,
+            exchange_name=exchange,
             routing_key=routing
         )
 
@@ -316,6 +323,38 @@ async def post_publish(request):
         )
         return web.Response()
 
-    except ConnectionRefusedError as ex:
+    except Exception as ex:
         LOGGER.warn(f'Unable to publish {args}: {ex}')
         return web.Response(body='Event bus connection refused', status=500)
+
+
+@routes.post('/_debug/subscribe')
+async def post_subscribe(request):
+    """
+    ---
+    tags:
+    - Events
+    summary: Subscribe to events.
+    operationId: events.subscribe
+    produces:
+    - text/plain
+    parameters:
+    -
+        in: body
+        name: body
+        description: Event message
+        required: true
+        schema:
+            type: object
+            properties:
+                exchange:
+                    type: string
+                routing:
+                    type: string
+    """
+    args = await request.json()
+    get_listener(request.app).subscribe(
+        args['exchange'],
+        args['routing']
+    )
+    return web.Response()
