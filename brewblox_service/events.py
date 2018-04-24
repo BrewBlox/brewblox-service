@@ -5,8 +5,8 @@ Example use:
 
     events.setup(app)
 
-    async def on_message(queue, key, message):
-        logging.info(f'Message from {queue}: {key} = {message} ({type(message)})')
+    async def on_message(subscription, key, message):
+        logging.info(f'Message from {subscription}: {key} = {message} ({type(message)})')
 
     listener = events.get_listener(app)
     listener.subscribe('brewblox', 'controller', on_message=on_message)
@@ -15,14 +15,12 @@ Example use:
 """
 
 import asyncio
-import errno
 import json
 import logging
-import socket
 from concurrent.futures import CancelledError
-from typing import Callable, Type, Union
+from typing import Callable, Type, Union, List
+from datetime import timedelta
 
-import aio_pika
 from aiohttp import web
 from brewblox_service.handler import ServiceHandler
 
@@ -38,6 +36,8 @@ LISTENER_KEY = 'events.listener'
 PUBLISHER_KEY = 'events.publisher'
 EVENTBUS_HOST = 'localhost'
 EVENTBUS_PORT = 5672
+RECONNECT_INTERVAL = timedelta(seconds=1)
+PENDING_WAIT_TIMEOUT = timedelta(seconds=5)
 
 
 def setup(app: Type[web.Application]):
@@ -54,44 +54,24 @@ def get_publisher(app: Type[web.Application]) -> 'EventPublisher':
     return app[PUBLISHER_KEY]
 
 
-async def _default_on_message(queue: Type[aio_pika.Queue], key: str, message: Union[dict, str]):
-    LOGGER.info(f'Unhandled event: queue={queue}, key={key} message={message}')
+##############################################################################
+# Incoming events
+##############################################################################
 
 
-async def _wait_host_resolved(loop: asyncio.BaseEventLoop):  # pragma: no cover
-    """
-    Dirty patch: use a non-blocking getaddrinfo to wait until host IP can be determined.
-    Reference: https://github.com/mosquito/aio-pika/issues/124
-    """
-    first_attempt = True
-    while True:
-        try:
-            await loop.getaddrinfo(host=EVENTBUS_HOST, port=EVENTBUS_PORT,
-                                   family=0, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP)
-            break
-        except OSError as error:
-            if error.errno == errno.EINTR:
-                # Not actually an error, but still need to try again
-                continue
-
-            if first_attempt:
-                LOGGER.warn(f'Failed to resolve host "{EVENTBUS_HOST}", will keep trying...')
-                first_attempt = False
-
-            await asyncio.sleep(1)
-            continue
+async def _default_on_message(sub: 'EventSubscription', key: str, message: Union[dict, str]):
+    LOGGER.info(f'Unhandled event: subscription={sub}, key={key}, message={message}')
 
 
 class EventSubscription():
     def __init__(self,
                  exchange_name: str,
                  routing: str,
-                 exchange_type: ExchangeType_=aio_pika.ExchangeType.TOPIC,
+                 exchange_type: ExchangeType_='topic',
                  on_message: EVENT_CALLBACK_=None):
         self._routing = routing
         self._exchange_name = exchange_name
         self._exchange_type = exchange_type
-        self._queue = None
         self.on_message = on_message
 
     def __str__(self):
@@ -105,43 +85,58 @@ class EventSubscription():
     def on_message(self, f: EVENT_CALLBACK_):
         self._on_message = f if f else _default_on_message
 
-    async def declare_on_remote(self, connection: Type[aio_pika.Connection]):
-        LOGGER.info(f'Declaring event bus subscription {self} on {connection}')
-        channel = await connection.channel()
-        exchange = await channel.declare_exchange(self._exchange_name,
-                                                  type=self._exchange_type,
-                                                  auto_delete=True)
-        self._queue = await channel.declare_queue(exclusive=True)
-        await self._queue.bind(exchange, self._routing)
-        await self._queue.consume(self._relay)
+    async def declare_on_remote(self, channel: aioamqp.channel.Channel):
+        LOGGER.info(f'Declaring event bus subscription {self} on {channel}')
 
-    async def _relay(self, message: Type[aio_pika.IncomingMessage]):
+        await channel.exchange_declare(
+            exchange_name=self._exchange_name,
+            type_name=self._exchange_type,
+            auto_delete=True
+        )
+
+        queue_info = await channel.queue_declare(exclusive=True)
+        queue_name = queue_info['queue']
+
+        await channel.queue_bind(
+            queue_name=queue_name,
+            exchange_name=self._exchange_name,
+            routing_key=self._routing
+        )
+
+        await channel.basic_consume(
+            callback=self._relay,
+            queue_name=queue_name
+        )
+
+    async def _relay(self,
+                     channel: aioamqp.channel.Channel,
+                     body: str,
+                     envelope: aioamqp.envelope.Envelope,
+                     properties: aioamqp.properties.Properties):
         """Relays incoming messages between the queue and the user callback"""
-        message.ack()  # We always acknowledge, regardless of errors in client code
         try:
-            await self.on_message(self, message.routing_key, json.loads(message.body))
+            await self.on_message(self, envelope.routing_key, json.loads(body))
         except Exception as ex:
             LOGGER.error(f'Exception relaying message in {self}: {ex}')
 
 
 class EventListener(ServiceHandler):
-    def __init__(self, app: web.Application=None):
+    def __init__(self, app: web.Application=None, host: str=EVENTBUS_HOST):
         super().__init__(app)
+
+        self._host: str = host
 
         # Asyncio queues need a context loop
         # We'll initialize self._pending when we have one
-        self._pending_pre_async = []
-        self._pending = None
-        self._connection = None
-        self._task = None
+        self._pending_pre_async: List[EventSubscription] = []
+        self._pending: asyncio.Queue = None
+        self._subscriptions: List[EventSubscription] = []
+
+        self._loop: asyncio.BaseEventLoop = None
+        self._task: asyncio.Task = None
 
     def __str__(self):
-        return f'<{type(self).__name__} {self._connection}>'
-
-    def _on_connected(self, connection):
-        if not connection.is_closed:
-            LOGGER.info(f'Connected {self}')
-            self._task = connection.loop.create_task(self._listen())
+        return f'<{type(self).__name__} {self._host}>'
 
     async def start(self, loop: asyncio.BaseEventLoop):
         # Initialize the async queue now we know which loop we're using
@@ -153,32 +148,23 @@ class EventListener(ServiceHandler):
         # We won't be needing this anymore
         self._pending_pre_async = None
 
-        # TODO(Bob): temporary fix for aio-pika using blocking getaddrinfo
-        await _wait_host_resolved(loop)
-
-        # Create the connection
-        # We want to start listening it now, and whenever we reconnect
-        self._connection = await aio_pika.connect_robust(loop=loop, host=EVENTBUS_HOST)
-        self._connection.add_reconnect_callback(self._on_connected)
-        self._on_connected(self._connection)
+        self._task = loop.create_task(self._listen())
 
     async def close(self):
         LOGGER.info(f'Closing {self}')
 
-        if self._task:
-            try:
-                self._task.cancel()
-                await self._task
-            except CancelledError:
-                pass
-
-        if self._connection and not self._connection.is_closed:
-            await self._connection.close()
+        try:
+            self._task.cancel()
+            await self._task
+        except Exception:
+            pass
+        finally:
+            self._task = None
 
     def subscribe(self,
                   exchange_name: str,
                   routing: str,
-                  exchange_type: ExchangeType_=aio_pika.ExchangeType.TOPIC,
+                  exchange_type: ExchangeType_='topic',
                   on_message: EVENT_CALLBACK_=None):
         """Adds a new event subscription to the listener.
 
@@ -201,38 +187,87 @@ class EventListener(ServiceHandler):
             self._pending.put_nowait(sub)
         else:
             self._pending_pre_async.append(sub)
+            LOGGER.info(f'Deferred event bus subscription: [{sub}]')
 
-        LOGGER.info(f'New event bus subscription: [{sub}]')
         return sub
 
     async def _listen(self):
-        try:
-            while not self._connection.is_closed:
-                subscription = await self._pending.get()
+        while True:
+            try:
+                transport, protocol = await aioamqp.connect(
+                    host=self._host,
+                    loop=self._loop
+                )
 
-                # Check whether connection wasn't closed while waiting for queue
-                if not self._connection.is_closed:
-                    await subscription.declare_on_remote(self._connection)
+                channel = await protocol.channel()
 
-                else:  # pragma: no cover
-                    # Connection closed while retrieving
-                    # Put it back in the queue, we'll declare it after reconnect
-                    self._pending.put_nowait(subscription)
+                LOGGER.info(f'Connected {self}')
 
-        except RuntimeError as ex:  # pragma: no cover
-            LOGGER.warn(f'Error in {self} {ex}')
-        except CancelledError:
-            LOGGER.info(f'Cancelled {self}')
+                # Declare all current subscriptions if reconnecting
+                [await sub.declare_on_remote(channel) for sub in self._subscriptions]
 
+                while True:
+                    subscription = None
+
+                    try:
+                        subscription = await self._pending.get()
+                        await protocol.ensure_open()
+
+                    except Exception:
+                        # If we already retrieved subscription, put it back in the queue
+                        # We'll declare it after reconnect
+                        if subscription:
+                            self._pending.put_nowait(subscription)
+
+                        raise
+
+                    await subscription.declare_on_remote(channel)
+                    self._subscriptions.append(subscription)
+
+            except CancelledError:
+                LOGGER.info(f'Cancelled {self}')
+                break
+
+            except ConnectionRefusedError:
+                LOGGER.debug(f'Connection refused in {self}')
+                await asyncio.sleep(RECONNECT_INTERVAL.seconds)
+                continue
+
+            except aioamqp.exceptions.AioamqpException as ex:
+                LOGGER.warn(f'Connection error in {self}: {type(ex)}:{ex}')
+                await asyncio.sleep(RECONNECT_INTERVAL.seconds)
+                continue
+
+            except Exception as ex:
+                LOGGER.error(f'Critical error in {self}: {type(ex)}:{ex}', exc_info=True)
+                break
+
+            finally:
+                try:
+                    await protocol.close()
+                    transport.close()
+                except Exception:
+                    pass
+
+
+##############################################################################
+# Outgoing events
+##############################################################################
 
 class EventPublisher(ServiceHandler):
     def __init__(self, app: web.Application=None, host: str=EVENTBUS_HOST):
         super().__init__(app)
 
+        self._loop: asyncio.BaseEventLoop = None
+
         self._host: str = host
         self._transport = None
         self._protocol: aioamqp.AmqpProtocol = None
         self._channel: aioamqp.channel.Channel = None
+
+    @property
+    def connected(self):
+        return self._transport and self._protocol and self._channel
 
     def __str__(self):
         return f'<{type(self).__name__} {self._host}>'
@@ -240,36 +275,42 @@ class EventPublisher(ServiceHandler):
     async def start(self, loop: asyncio.BaseEventLoop):
         self._loop = loop
 
-        self._transport, self._protocol = await aioamqp.connect(
-            host=self._host,
-            loop=self._loop
-        )
-
     async def close(self):
         LOGGER.info(f'Closing {self}')
 
-        if self._protocol:
+        try:
             await self._protocol.close()
+            self._transport.close()
+        except Exception:
+            pass
+        finally:
             self._protocol = None
+            self._transport = None
             self._channel = None
 
-        if self._transport:
-            self._transport.close()
-            self._protocol = None
+    async def _ensure_channel(self):
+
+        # Lazy connect
+        if not self.connected:
+            self._transport, self._protocol = await aioamqp.connect(
+                host=self._host,
+                loop=self._loop
+            )
+            self._channel = await self._protocol.channel()
+
+        # Assert connection
+        try:
+            await self._protocol.ensure_open()
+        except aioamqp.exceptions.AioamqpException:
+            await self.close()
+            raise
 
     async def publish(self,
                       exchange: str,
                       routing: str,
                       message: Union[str, dict]='',
                       exchange_type: ExchangeType_='topic'):
-        assert self._protocol, 'No connection available'
-        await self._protocol.ensure_open()
-
-        if not self._channel:
-            self._channel = await self._protocol.channel()
-
-        if not self._channel.is_open:
-            await self._channel.open()
+        await self._ensure_channel()
 
         # json.dumps() also correctly handles strings
         data = json.dumps(message).encode()
@@ -286,6 +327,10 @@ class EventPublisher(ServiceHandler):
             routing_key=routing
         )
 
+
+##############################################################################
+# REST endpoints
+##############################################################################
 
 @routes.post('/_debug/publish')
 async def post_publish(request):

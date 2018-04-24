@@ -13,7 +13,6 @@ aiohttp = "*"
 aiodns = "*"
 cchardet = "*"
 aiohttp-swagger = "*"
-aio-pika = "*"
 aiohttp-cors = "*"
 aioamqp = "*"
 
