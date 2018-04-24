@@ -55,7 +55,8 @@ def mocked_connect(mocker, protocol_mock, transport_mock):
 async def app(app, mocker, loop, mocked_connect):
     """App with events enabled"""
     events.setup(app)
-    events.RECONNECT_INTERVAL = timedelta(microseconds=10)
+    mocker.patch(TESTED + '.PENDING_WAIT_TIMEOUT', timedelta(microseconds=10))
+    mocker.patch(TESTED + '.RECONNECT_INTERVAL', timedelta(microseconds=10))
     return app
 
 
@@ -207,16 +208,20 @@ async def test_subscribe_endpoint(app, client, channel_mock):
     )
 
 
-async def test_listener_exceptions(app, client, protocol_mock, transport_mock, mocked_connect):
+async def test_listener_exceptions(app, client, protocol_mock, channel_mock, transport_mock, mocked_connect):
     listener = events.get_listener(app)
-    protocol_mock.ensure_open.side_effect = ConnectionRefusedError
 
+    channel_mock.basic_consume.side_effect = ConnectionRefusedError
     listener.subscribe('exchange', 'routing')
 
+    # Let listener attempt to declare the new subscription a few times
+    # In real scenarios we'd expect ensure_open() to also start raising exceptions
+    await asyncio.sleep(0.01)
+    protocol_mock.ensure_open.side_effect = aioamqp.AmqpClosedConnection
     await asyncio.sleep(0.01)
 
-    # Retrieved subscription, errored on ensure_open(), and put subscription back
-    assert protocol_mock.ensure_open.call_count >= 1
+    # Retrieved subscription, errored on basic_consume(), and put subscription back
+    assert channel_mock.basic_consume.call_count >= 1
     assert listener._pending.qsize() == 1
     assert not listener._task.done()
 
@@ -233,6 +238,13 @@ async def test_listener_exceptions(app, client, protocol_mock, transport_mock, m
     # Should be closed every time it was opened
     assert protocol_mock.close.call_count == mocked_connect.call_count
     assert transport_mock.close.call_count == mocked_connect.call_count
+
+
+async def test_listener_periodic_check(mocker, app, client, loop, protocol_mock):
+    # Check that the listener periodically called ensure_open to check
+    start_count = protocol_mock.ensure_open.call_count
+    await asyncio.sleep(0.1)
+    assert protocol_mock.ensure_open.call_count > start_count
 
 
 async def test_listener_close_error(app, client, loop, mocked_connect):

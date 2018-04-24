@@ -17,7 +17,7 @@ Example use:
 import asyncio
 import json
 import logging
-from concurrent.futures import CancelledError
+from concurrent.futures import CancelledError, TimeoutError
 from typing import Callable, Type, Union, List
 from datetime import timedelta
 
@@ -57,7 +57,6 @@ def get_publisher(app: Type[web.Application]) -> 'EventPublisher':
 ##############################################################################
 # Incoming events
 ##############################################################################
-
 
 async def _default_on_message(sub: 'EventSubscription', key: str, message: Union[dict, str]):
     LOGGER.info(f'Unhandled event: subscription={sub}, key={key}, message={message}')
@@ -210,19 +209,26 @@ class EventListener(ServiceHandler):
                     subscription = None
 
                     try:
-                        subscription = await self._pending.get()
                         await protocol.ensure_open()
+                        subscription = await asyncio.wait_for(
+                            self._pending.get(),
+                            timeout=PENDING_WAIT_TIMEOUT.seconds
+                        )
+
+                    except TimeoutError:
+                        # Timeout ensures that connection state is checked at least once per timeout
+                        continue
+
+                    try:
+                        await protocol.ensure_open()
+                        await subscription.declare_on_remote(channel)
+                        self._subscriptions.append(subscription)
 
                     except Exception:
-                        # If we already retrieved subscription, put it back in the queue
+                        # Put subscription back in queue
                         # We'll declare it after reconnect
-                        if subscription:
-                            self._pending.put_nowait(subscription)
-
+                        self._pending.put_nowait(subscription)
                         raise
-
-                    await subscription.declare_on_remote(channel)
-                    self._subscriptions.append(subscription)
 
             except CancelledError:
                 LOGGER.info(f'Cancelled {self}')
@@ -259,11 +265,8 @@ class EventPublisher(ServiceHandler):
         super().__init__(app)
 
         self._loop: asyncio.BaseEventLoop = None
-
         self._host: str = host
-        self._transport = None
-        self._protocol: aioamqp.AmqpProtocol = None
-        self._channel: aioamqp.channel.Channel = None
+        self._reset()
 
     @property
     def connected(self):
@@ -275,6 +278,11 @@ class EventPublisher(ServiceHandler):
     async def start(self, loop: asyncio.BaseEventLoop):
         self._loop = loop
 
+    def _reset(self):
+        self._transport = None
+        self._protocol: aioamqp.AmqpProtocol = None
+        self._channel: aioamqp.channel.Channel = None
+
     async def close(self):
         LOGGER.info(f'Closing {self}')
 
@@ -284,12 +292,9 @@ class EventPublisher(ServiceHandler):
         except Exception:
             pass
         finally:
-            self._protocol = None
-            self._transport = None
-            self._channel = None
+            self._reset()
 
     async def _ensure_channel(self):
-
         # Lazy connect
         if not self.connected:
             self._transport, self._protocol = await aioamqp.connect(
@@ -310,7 +315,12 @@ class EventPublisher(ServiceHandler):
                       routing: str,
                       message: Union[str, dict]='',
                       exchange_type: ExchangeType_='topic'):
-        await self._ensure_channel()
+        try:
+            await self._ensure_channel()
+        except Exception:
+            # If server has restarted since our last attempt, ensure channel will fail (old connection invalid)
+            # Retry once to check whether a new connection can be made
+            await self._ensure_channel()
 
         # json.dumps() also correctly handles strings
         data = json.dumps(message).encode()
