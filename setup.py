@@ -25,7 +25,7 @@ setup(
         'cchardet',
         'aiohttp-cors',
         'aiohttp-swagger',
-        'aio-pika',
+        'aioamqp',
     ],
     python_requires='>=3.6',
     extras_require={'dev': ['tox']},

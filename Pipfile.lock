@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "0cee66e556464466b87d5f69a860e24db6ddec36470934efda9d8cad2335fbb3"
+            "sha256": "22502007172d6a1bbb35f9ebb919e078a718c3be55b24365ea95bec761099e69"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -16,13 +16,13 @@
         ]
     },
     "default": {
-        "aio-pika": {
+        "aioamqp": {
             "hashes": [
-                "sha256:167dad667a3a67330abe9897ed4436b322f4da890843bead717c90a8dea20754",
-                "sha256:a9c2bc95d87a380b6f82b8c188180d6b05a98ca3ddb892e78d131af78fa81721"
+                "sha256:2fa0c7b1199f196f7bc04d3a486fea1a0ed44387bf0d2241a823116a6dfdadff",
+                "sha256:c618af6d005942a2a8711f7548348f9028fac2673f0dc2d192310cef83486204"
             ],
             "index": "pypi",
-            "version": "==2.6.0"
+            "version": "==0.10.0"
         },
         "aiodns": {
             "hashes": [
@@ -174,13 +174,6 @@
             ],
             "version": "==4.2.0"
         },
-        "pika": {
-            "hashes": [
-                "sha256:63131aaeec48a6c8f1db1fe657e1e74cf384c3927eb7d1725e31edae4220dea4",
-                "sha256:7277b4d12a99efa4058782614d84138983f9f89d690bdfcea66290d810806459"
-            ],
-            "version": "==0.10.0"
-        },
         "pprint": {
             "hashes": [
                 "sha256:c0fa22d1462351671ca098e9779bb26a23880011e93eea5f199a150ee7b92a16"
@@ -232,12 +225,6 @@
                 "sha256:e863072cdf4c72eebf179342c94e6989c67185842d9997960b3e69290b2fa269"
             ],
             "version": "==3.12"
-        },
-        "shortuuid": {
-            "hashes": [
-                "sha256:d08fd398f40f8baf87e15eef8355e92fa541bca4eb8465fefab7ee22f92711b9"
-            ],
-            "version": "==0.5.0"
         },
         "yarl": {
             "hashes": [
@@ -422,7 +409,6 @@
         },
         "pluggy": {
             "hashes": [
-                "sha256:714306e9b9a7b24ee4c1e3ff6463d7f652cdd30f4693121b31572e2fe1fdaea3",
                 "sha256:7f8ae7f5bdf75671a718d2daf0a64b7885f74510bcd98b1a0bb420eb9a9d0cff",
                 "sha256:d345c8fe681115900d6da8d048ba67c25df42973bda370783cd58826442dcd7c",
                 "sha256:e160a7fcf25762bb60efc7e171d4497ff1d8d2d75a3d0df7a21b76821ecbf5c5"

@@ -60,12 +60,8 @@ def test_init_logging(mocker):
     assert log_mock.getLogger().addHandler.call_count == 0
 
     log_mock.getLogger.assert_has_calls([
-        call('pika'),
-        call().setLevel(log_mock.CRITICAL),
-        call('pika.adapters.base_connection'),
-        call().setLevel(log_mock.CRITICAL),
-        call('aio_pika.robust_connection'),
-        call().setLevel(log_mock.CRITICAL),
+        call('aioamqp'),
+        call().setLevel(log_mock.WARN),
         call('asyncio'),
         call().setLevel(log_mock.CRITICAL),
     ])

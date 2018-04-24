@@ -2,54 +2,61 @@
 Tests functionality offered by brewblox_service.events
 """
 
+import asyncio
 import json
+from datetime import timedelta
 from unittest.mock import Mock, call
 
-import aio_pika
+import aioamqp
 import pytest
-from asynctest import Mock as AsyncMock
 from asynctest import CoroutineMock
-
 from brewblox_service import events
 
 TESTED = events.__name__
 
 
-def set_connect_func(mocker, closed: bool):
-
-    async def mocked_connect_robust(loop=None, host=None):
-        conn_mock = AsyncMock(spec=aio_pika.robust_connection.RobustConnection)
-        conn_mock.loop = loop
-        conn_mock.is_closed = closed
-
-        chan_mock = CoroutineMock()
-        exchange_mock = CoroutineMock()
-        queue_mock = CoroutineMock()
-
-        queue_mock.bind = CoroutineMock()
-        queue_mock.consume = CoroutineMock()
-
-        exchange_mock.publish = CoroutineMock()
-
-        chan_mock.declare_exchange = CoroutineMock(return_value=exchange_mock)
-        chan_mock.declare_queue = CoroutineMock(return_value=queue_mock)
-
-        conn_mock.close = CoroutineMock()
-        conn_mock.channel = CoroutineMock(return_value=chan_mock)
-
-        return conn_mock
-
-    mocker.patch.object(events.aio_pika, 'connect_robust',
-                        mocked_connect_robust)
+@pytest.fixture
+def channel_mock():
+    m = Mock()
+    m.exchange_declare = CoroutineMock()
+    m.queue_declare = CoroutineMock(return_value={'queue': 'queue_name'})
+    m.queue_bind = CoroutineMock()
+    m.basic_consume = CoroutineMock()
+    m.basic_publish = CoroutineMock()
+    return m
 
 
 @pytest.fixture
-async def app(app, mocker, loop):
-    """App with events enabled"""
-    set_connect_func(mocker, closed=False)
-    mocker.patch(TESTED + '._wait_host_resolved', CoroutineMock())
+def protocol_mock(channel_mock):
+    m = Mock()
+    m.channel = CoroutineMock(return_value=channel_mock)
+    m.ensure_open = CoroutineMock()
+    m.close = CoroutineMock()
+    return m
 
+
+@pytest.fixture
+def transport_mock():
+    return Mock()
+
+
+@pytest.fixture
+def mocked_connect(mocker, protocol_mock, transport_mock):
+    # connect()
+    conn_mock_func = CoroutineMock(spec=aioamqp.connect)
+    conn_mock_func.return_value = (transport_mock, protocol_mock)
+
+    mocker.patch.object(events.aioamqp, 'connect', conn_mock_func)
+
+    return conn_mock_func
+
+
+@pytest.fixture
+async def app(app, mocker, loop, mocked_connect):
+    """App with events enabled"""
     events.setup(app)
+    mocker.patch(TESTED + '.PENDING_WAIT_TIMEOUT', timedelta(microseconds=10))
+    mocker.patch(TESTED + '.RECONNECT_INTERVAL', timedelta(microseconds=10))
     return app
 
 
@@ -61,32 +68,33 @@ async def test_setup(app, client):
 async def test_subscribe_callbacks(app, client, mocker):
     cb = Mock()
     content = dict(key='var')
-    pika_msg = Mock()
-    pika_msg.routing_key = 'message_key'
-    pika_msg.body = json.dumps(content)
+
+    chan_mock = Mock()
+    body = json.dumps(content)
+    envelope_mock = Mock()
+    envelope_mock.routing_key = 'message_key'
+    properties_mock = Mock()
 
     sub = events.get_listener(app).subscribe(
         'brewblox', 'router', on_message=cb)
 
-    await sub._relay(pika_msg)
+    await sub._relay(chan_mock, body, envelope_mock, properties_mock)
     cb.assert_called_once_with(sub, 'message_key', content)
-    assert pika_msg.ack.call_count == 1
 
     cb2 = Mock()
     sub.on_message = cb2
 
-    await sub._relay(pika_msg)
+    await sub._relay(chan_mock, body, envelope_mock, properties_mock)
     cb2.assert_called_once_with(sub, 'message_key', content)
     assert cb.call_count == 1
-    assert pika_msg.ack.call_count == 2
 
     # Shouldn't blow up
     cb2.side_effect = ValueError
-    await sub._relay(pika_msg)
+    await sub._relay(chan_mock, body, envelope_mock, properties_mock)
 
     # Should be tolerated
     sub.on_message = None
-    await sub._relay(pika_msg)
+    await sub._relay(chan_mock, body, envelope_mock, properties_mock)
 
 
 async def test_offline_listener(app, mocker):
@@ -131,33 +139,14 @@ async def test_online_listener(app, client, mocker):
     await listener.close()
 
 
-async def test_closed_listener(app, client, mocker):
-    set_connect_func(mocker, closed=True)
-
-    listener = events.EventListener()
-    await listener.start(app.loop)
-
-
-async def test_disconnect_listener(app, client, mocker):
-    listener = events.EventListener()
-    await listener.start(app.loop)
-
-    # Task should be started
-    assert listener._task
-
-    # Close connection. Task should gracefully exit now
-    listener._connection.is_closed = True
-    await listener._task
-
-
 async def test_offline_publisher(app):
     publisher = events.EventPublisher(app)
 
     assert publisher._startup in app.on_startup
     assert publisher._cleanup in app.on_cleanup
 
-    with pytest.raises(ConnectionRefusedError):
-        await publisher.publish('exchange', 'key', message=dict(key='val'))
+    # with pytest.raises(ConnectionRefusedError):
+    await publisher.publish('exchange', 'key', message=dict(key='val'))
 
 
 async def test_online_publisher(app, client, mocker):
@@ -170,13 +159,6 @@ async def test_online_publisher(app, client, mocker):
 
     await publisher.publish('exchange', 'key', message=dict(key='val'))
     await publisher.publish('exchange', 'key', message=dict(key='val'))
-
-
-async def test_closed_publisher(app, client, mocker):
-    set_connect_func(mocker, closed=True)
-
-    publisher = events.EventPublisher()
-    await publisher.start(app.loop)
 
 
 async def test_publish_endpoint(app, client, mocker):
@@ -197,7 +179,7 @@ async def test_publish_endpoint(app, client, mocker):
     ))).status == 200
 
     # return 500 on connection refused
-    events.get_publisher(app)._connection.is_closed = True
+    events.get_publisher(app)._ensure_channel = CoroutineMock(side_effect=ConnectionRefusedError)
     assert (await client.post('/_debug/publish', json=dict(
         exchange='exchange',
         routing='third',
@@ -209,3 +191,79 @@ async def test_publish_endpoint(app, client, mocker):
         call('exchange', 'second', 'message'),
         call('exchange', 'third', 'message'),
     ])
+
+
+async def test_subscribe_endpoint(app, client, channel_mock):
+    assert (await client.post('/_debug/subscribe', json=dict(
+        exchange='exchange',
+        routing='routing.key'
+    ))).status == 200
+
+    await asyncio.sleep(0.01)
+
+    channel_mock.queue_bind.assert_called_once_with(
+        queue_name='queue_name',
+        exchange_name='exchange',
+        routing_key='routing.key'
+    )
+
+
+async def test_listener_exceptions(app, client, protocol_mock, channel_mock, transport_mock, mocked_connect):
+    listener = events.get_listener(app)
+
+    channel_mock.basic_consume.side_effect = ConnectionRefusedError
+    listener.subscribe('exchange', 'routing')
+
+    # Let listener attempt to declare the new subscription a few times
+    # In real scenarios we'd expect ensure_open() to also start raising exceptions
+    await asyncio.sleep(0.01)
+    protocol_mock.ensure_open.side_effect = aioamqp.AmqpClosedConnection
+    await asyncio.sleep(0.01)
+
+    # Retrieved subscription, errored on basic_consume(), and put subscription back
+    assert channel_mock.basic_consume.call_count >= 1
+    assert listener._pending.qsize() == 1
+    assert not listener._task.done()
+
+    # Recoverable error
+    protocol_mock.ensure_open.side_effect = aioamqp.AmqpClosedConnection
+    await asyncio.sleep(0.01)
+    assert not listener._task.done()
+
+    # Critical error
+    protocol_mock.ensure_open.side_effect = RuntimeError
+    await asyncio.sleep(0.01)
+    assert listener._task.done()
+
+    # Should be closed every time it was opened
+    assert protocol_mock.close.call_count == mocked_connect.call_count
+    assert transport_mock.close.call_count == mocked_connect.call_count
+
+
+async def test_listener_periodic_check(mocker, app, client, loop, protocol_mock):
+    # Check that the listener periodically called ensure_open to check
+    start_count = protocol_mock.ensure_open.call_count
+    await asyncio.sleep(0.1)
+    assert protocol_mock.ensure_open.call_count > start_count
+
+
+async def test_listener_close_error(app, client, loop, mocked_connect):
+    mocked_connect.side_effect = ConnectionRefusedError
+    listener = events.EventListener()
+    await listener.start(loop)
+    await asyncio.sleep(0.01)
+
+    # ConnectionRefused is deemed recoverable
+    assert not listener._task.done()
+
+    # Closed after unrecoverable error, but application still alive
+    mocked_connect.side_effect = RecursionError
+    await asyncio.sleep(0.01)
+    assert listener._task.done()
+
+
+async def test_publisher_exceptions(app, client, protocol_mock):
+    protocol_mock.ensure_open.side_effect = aioamqp.AmqpClosedConnection
+
+    with pytest.raises(aioamqp.AmqpClosedConnection):
+        await events.get_publisher(app).publish('exchange', 'routing', 'message')
