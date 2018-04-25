@@ -37,14 +37,11 @@ read answer
 if [[ "$answer" =~ (y|Y|yes) ]]; then
 	version="${major}.${minor}.${patch}"
 	tag_message="Version $version"
-	latest_message_version="$version"
 
 	[ $major -eq 0 ] && tag_message="$tag_message Beta"
-	[ $major -eq 0 ] && latest_message_version="$latest_message_version Beta"
 
 	# Add the tag
 	git tag -a $version -m "$tag_message" > /dev/null
-	git tag -af latest -m "Latest recommended version ($latest_message_version)" > /dev/null
 
 	echo "Latest tags:"
 	git tag -n1 | tail -n5

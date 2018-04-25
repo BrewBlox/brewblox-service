@@ -32,7 +32,7 @@ deploy:
     on:
       tags: true
 
-  # Deploy dev version to PyPi on any push to an upstream branch
+  # Deploy dev version to PyPi on any push to an upstream development branch
   - provider: pypi
     user: $PYPI_USER
     password: $PYPI_PASSWORD
@@ -41,6 +41,7 @@ deploy:
       tags: false
       repo: $GITHUB_REPO
       all_branches: true
+      condition: $TRAVIS_BRANCH != master
 
   # Deploy "latest" and version tag to Docker Hub on tagged commits
   - provider: script
@@ -58,7 +59,7 @@ deploy:
     on:
       tags: true
 
-  # Deploy branch to Docker Hub on any push to an upstream branch
+  # Deploy branch to Docker Hub on any push to an upstream development branch
   - provider: script
     script:
       python3 -u ./deploy_docker.py 
@@ -75,3 +76,4 @@ deploy:
       tags: false
       repo: $GITHUB_REPO
       all_branches: true
+      condition: $TRAVIS_BRANCH != master
