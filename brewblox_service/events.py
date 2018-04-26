@@ -34,7 +34,7 @@ ExchangeType_ = Type[str]
 
 LISTENER_KEY = 'events.listener'
 PUBLISHER_KEY = 'events.publisher'
-EVENTBUS_HOST = 'localhost'
+EVENTBUS_HOST = 'eventbus'
 EVENTBUS_PORT = 5672
 RECONNECT_INTERVAL = timedelta(seconds=1)
 PENDING_WAIT_TIMEOUT = timedelta(seconds=5)
