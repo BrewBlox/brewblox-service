@@ -64,6 +64,8 @@ def test_init_logging(mocker):
         call().setLevel(log_mock.WARN),
         call('asyncio'),
         call().setLevel(log_mock.CRITICAL),
+        call('aiohttp.access'),
+        call().setLevel(log_mock.WARN),
     ])
 
     args = service.create_parser('brewblox').parse_args(['-o', 'outfile'])

@@ -61,6 +61,7 @@ async def app(app, mocker, loop, mocked_connect):
 
 
 async def test_setup(app, client):
+    assert events.EVENTBUS_HOST == 'eventbus'
     assert events.get_listener(app)
     assert events.get_publisher(app)
 
