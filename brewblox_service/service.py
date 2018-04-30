@@ -58,6 +58,7 @@ def _init_logging(args: Type[argparse.Namespace]):
     if not args.debug:
         logging.getLogger('aioamqp').setLevel(logging.WARN)
         logging.getLogger('asyncio').setLevel(logging.CRITICAL)
+        logging.getLogger('aiohttp.access').setLevel(logging.WARN)
 
 
 def create_parser(default_name: str) -> Type[argparse.ArgumentParser]:

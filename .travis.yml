@@ -11,14 +11,12 @@ env:
     - DOCKER_REPO=brewblox/brewblox-service
     - GITHUB_REPO=BrewBlox/brewblox-service
 
-install: pip install tox docker
+install: pip install tox brewblox-tools~=0.2.0
 
 script: tox
 
 before_deploy:
-  chmod +x ./distcopy.sh
-  && ./distcopy.sh ./docker/pkg
-  && ./distcopy.sh ./rpi-docker/pkg
+  bbt-distcopy .tox/dist/ docker/pkg/ rpi-docker/pkg/
   && docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
   && docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
@@ -46,12 +44,12 @@ deploy:
   # Deploy "latest" and version tag to Docker Hub on tagged commits
   - provider: script
     script:
-      python3 -u ./deploy_docker.py
+      bbt-deploy-docker
       --image docker
       --name "$DOCKER_REPO"
       --tags latest $(git describe --tags)
       &&
-      python3 -u ./deploy_docker.py
+      bbt-deploy-docker
       --image rpi-docker
       --name "$DOCKER_REPO"
       --tags rpi-latest rpi-$(git describe --tags)
@@ -62,12 +60,12 @@ deploy:
   # Deploy branch to Docker Hub on any push to an upstream development branch
   - provider: script
     script:
-      python3 -u ./deploy_docker.py 
+      bbt-deploy-docker
       --image docker
       --name "$DOCKER_REPO"
       --tags "$TRAVIS_BRANCH"
       &&
-      python3 -u ./deploy_docker.py 
+      bbt-deploy-docker
       --image rpi-docker
       --name "$DOCKER_REPO"
       --tags rpi-$TRAVIS_BRANCH
