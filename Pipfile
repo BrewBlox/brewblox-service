@@ -8,9 +8,7 @@ name = "pypi"
 [packages]
 
 pprint = "*"
-dpath = "*"
 aiohttp = "*"
-aiodns = "*"
 cchardet = "*"
 aiohttp-swagger = "*"
 aiohttp-cors = "*"

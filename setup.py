@@ -19,9 +19,7 @@ setup(
     packages=find_packages(exclude=['test']),
     install_requires=[
         'pprint',
-        'dpath',
         'aiohttp',
-        'aiodns',
         'cchardet',
         'aiohttp-cors',
         'aiohttp-swagger',
