@@ -226,41 +226,28 @@ async def test_listener_exceptions(app, client, protocol_mock, channel_mock, tra
     assert listener._pending.qsize() == 1
     assert not listener._task.done()
 
-    # Recoverable error
-    protocol_mock.ensure_open.side_effect = aioamqp.AmqpClosedConnection
+    # Error recovery
+    protocol_mock.ensure_open.side_effect = RuntimeError
     await asyncio.sleep(0.01)
     assert not listener._task.done()
 
-    # Critical error
-    protocol_mock.ensure_open.side_effect = RuntimeError
-    await asyncio.sleep(0.01)
-    assert listener._task.done()
-
     # Should be closed every time it was opened
+    await listener.close()
     assert protocol_mock.close.call_count == mocked_connect.call_count
     assert transport_mock.close.call_count == mocked_connect.call_count
 
 
 async def test_listener_periodic_check(mocker, app, client, loop, protocol_mock):
-    # Check that the listener periodically called ensure_open to check
-    start_count = protocol_mock.ensure_open.call_count
+    # No subscriptions were made - not listening
     await asyncio.sleep(0.1)
-    assert protocol_mock.ensure_open.call_count > start_count
+    assert protocol_mock.ensure_open.call_count == 0
 
+    listener = events.get_listener(app)
 
-async def test_listener_close_error(app, client, loop, mocked_connect):
-    mocked_connect.side_effect = ConnectionRefusedError
-    listener = events.EventListener()
-    await listener.start(app)
-    await asyncio.sleep(0.01)
-
-    # ConnectionRefused is deemed recoverable
-    assert not listener._task.done()
-
-    # Closed after unrecoverable error, but application still alive
-    mocked_connect.side_effect = RecursionError
-    await asyncio.sleep(0.01)
-    assert listener._task.done()
+    # Should be listening now, an periodically calling ensure_open()
+    listener.subscribe('exchange', 'routing')
+    await asyncio.sleep(0.1)
+    assert protocol_mock.ensure_open.call_count > 0
 
 
 async def test_publisher_exceptions(app, client, protocol_mock):
