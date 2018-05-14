@@ -18,40 +18,37 @@ import asyncio
 import json
 import logging
 from concurrent.futures import CancelledError, TimeoutError
-from typing import Callable, Type, Union, List
 from datetime import timedelta
-
-from aiohttp import web
-from brewblox_service.handler import ServiceHandler
+from typing import Callable, List, Union
 
 import aioamqp
+from aiohttp import web
+from brewblox_service import features
 
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
 
 EVENT_CALLBACK_ = Callable[['EventSubscription', str, Union[dict, str]], None]
-ExchangeType_ = Type[str]
+ExchangeType_ = str
 
-LISTENER_KEY = 'events.listener'
-PUBLISHER_KEY = 'events.publisher'
 EVENTBUS_HOST = 'eventbus'
 EVENTBUS_PORT = 5672
 RECONNECT_INTERVAL = timedelta(seconds=1)
 PENDING_WAIT_TIMEOUT = timedelta(seconds=5)
 
 
-def setup(app: Type[web.Application]):
-    app[LISTENER_KEY] = EventListener(app)
-    app[PUBLISHER_KEY] = EventPublisher(app)
+def setup(app: web.Application):
+    features.add(app, EventListener(app))
+    features.add(app, EventPublisher(app))
     app.router.add_routes(routes)
 
 
-def get_listener(app: Type[web.Application]) -> 'EventListener':
-    return app[LISTENER_KEY]
+def get_listener(app: web.Application) -> 'EventListener':
+    return features.get(app, EventListener)
 
 
-def get_publisher(app: Type[web.Application]) -> 'EventPublisher':
-    return app[PUBLISHER_KEY]
+def get_publisher(app: web.Application) -> 'EventPublisher':
+    return features.get(app, EventPublisher)
 
 
 ##############################################################################
@@ -119,7 +116,7 @@ class EventSubscription():
             LOGGER.error(f'Exception relaying message in {self}: {ex}')
 
 
-class EventListener(ServiceHandler):
+class EventListener(features.ServiceFeature):
     def __init__(self, app: web.Application=None, host: str=EVENTBUS_HOST):
         super().__init__(app)
 
@@ -137,9 +134,9 @@ class EventListener(ServiceHandler):
     def __str__(self):
         return f'<{type(self).__name__} {self._host}>'
 
-    async def start(self, loop: asyncio.BaseEventLoop):
+    async def start(self, app: web.Application):
         # Initialize the async queue now we know which loop we're using
-        self._pending = asyncio.Queue(loop=loop)
+        self._pending = asyncio.Queue(loop=app.loop)
 
         # Transfer all subscriptions that were made before the event loop started
         [self._pending.put_nowait(s) for s in self._pending_pre_async]
@@ -147,9 +144,9 @@ class EventListener(ServiceHandler):
         # We won't be needing this anymore
         self._pending_pre_async = None
 
-        self._task = loop.create_task(self._listen())
+        self._task = app.loop.create_task(self._listen())
 
-    async def close(self):
+    async def close(self, *args):
         LOGGER.info(f'Closing {self}')
 
         try:
@@ -260,7 +257,7 @@ class EventListener(ServiceHandler):
 # Outgoing events
 ##############################################################################
 
-class EventPublisher(ServiceHandler):
+class EventPublisher(features.ServiceFeature):
     def __init__(self, app: web.Application=None, host: str=EVENTBUS_HOST):
         super().__init__(app)
 
@@ -275,15 +272,15 @@ class EventPublisher(ServiceHandler):
     def __str__(self):
         return f'<{type(self).__name__} {self._host}>'
 
-    async def start(self, loop: asyncio.BaseEventLoop):
-        self._loop = loop
+    async def start(self, app: web.Application):
+        self._loop = app.loop
 
     def _reset(self):
         self._transport = None
         self._protocol: aioamqp.AmqpProtocol = None
         self._channel: aioamqp.channel.Channel = None
 
-    async def close(self):
+    async def close(self, *args):
         LOGGER.info(f'Closing {self}')
 
         try:
