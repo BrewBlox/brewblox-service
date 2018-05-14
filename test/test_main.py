@@ -17,7 +17,7 @@ def test_main(loop, mocker):
 
     main.main()
 
-    create_mock.assert_called_once_with(default_name='simulator')
+    create_mock.assert_called_once_with(default_name='_service')
     furnish_mock.assert_called_once_with(app_mock)
     run_mock.assert_called_once_with(app_mock)
     events_mock.assert_called_once_with(app_mock)
