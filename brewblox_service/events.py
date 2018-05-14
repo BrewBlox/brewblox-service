@@ -12,6 +12,10 @@ Example use:
     listener.subscribe('brewblox', 'controller', on_message=on_message)
     listener.subscribe('brewblox', 'controller.*', on_message=on_message)
     listener.subscribe('brewblox', 'controller.#', on_message=on_message)
+
+    publisher = events.get_publisher(app)
+    await publisher.publish('brewblox', 'controller.value', {'example': True})
+
 """
 
 import asyncio
@@ -189,6 +193,15 @@ class EventListener(features.ServiceFeature):
         return sub
 
     def _lazy_listen(self):
+        """
+        Ensures that the listener task only runs when actually needed.
+        This function is a noop if any of the preconditions is not met.
+
+        Preconditions are:
+        * An asyncio eventloop is available (self._loop)
+        * The task is not already running
+        * There are subscriptions: either pending, or active
+        """
         if all([
             self._loop,
             not self._task,
