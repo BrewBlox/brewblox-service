@@ -16,16 +16,15 @@ Example use:
 
 import asyncio
 import json
-import logging
 from concurrent.futures import CancelledError, TimeoutError
 from datetime import timedelta
 from typing import Callable, List, Union
 
 import aioamqp
 from aiohttp import web
-from brewblox_service import features
+from brewblox_service import brewblox_logger, features
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
 
 EVENT_CALLBACK_ = Callable[['EventSubscription', str, Union[dict, str]], None]
@@ -136,7 +135,8 @@ class EventListener(features.ServiceFeature):
 
     async def start(self, app: web.Application):
         # Initialize the async queue now we know which loop we're using
-        self._pending = asyncio.Queue(loop=app.loop)
+        self._loop = app.loop
+        self._pending = asyncio.Queue(loop=self._loop)
 
         # Transfer all subscriptions that were made before the event loop started
         [self._pending.put_nowait(s) for s in self._pending_pre_async]
@@ -144,7 +144,7 @@ class EventListener(features.ServiceFeature):
         # We won't be needing this anymore
         self._pending_pre_async = None
 
-        self._task = app.loop.create_task(self._listen())
+        self._lazy_listen()
 
     async def close(self, *args):
         LOGGER.info(f'Closing {self}')
@@ -185,9 +185,20 @@ class EventListener(features.ServiceFeature):
             self._pending_pre_async.append(sub)
             LOGGER.info(f'Deferred event bus subscription: [{sub}]')
 
+        self._lazy_listen()
         return sub
 
+    def _lazy_listen(self):
+        if all([
+            self._loop,
+            not self._task,
+            self._subscriptions or (self._pending and not self._pending.empty()),
+        ]):
+            self._task = self._loop.create_task(self._listen())
+
     async def _listen(self):
+        retrying = False
+
         while True:
             try:
                 transport, protocol = await aioamqp.connect(
@@ -207,6 +218,8 @@ class EventListener(features.ServiceFeature):
 
                     try:
                         await protocol.ensure_open()
+                        retrying = False
+
                         subscription = await asyncio.wait_for(
                             self._pending.get(),
                             timeout=PENDING_WAIT_TIMEOUT.seconds
@@ -231,25 +244,19 @@ class EventListener(features.ServiceFeature):
                 LOGGER.info(f'Cancelled {self}')
                 break
 
-            except ConnectionRefusedError:
-                LOGGER.debug(f'Connection refused in {self}')
-                await asyncio.sleep(RECONNECT_INTERVAL.seconds)
-                continue
-
-            except aioamqp.exceptions.AioamqpException as ex:
-                LOGGER.warn(f'Connection error in {self}: {type(ex)}:{ex}')
-                await asyncio.sleep(RECONNECT_INTERVAL.seconds)
-                continue
-
             except Exception as ex:
-                LOGGER.error(f'Critical error in {self}: {type(ex)}:{ex}', exc_info=True)
-                break
+                if not retrying:
+                    LOGGER.warn(f'Connection error in {self}: {type(ex)}:{ex}')
+                    retrying = True
+
+                await asyncio.sleep(RECONNECT_INTERVAL.seconds)
+                continue
 
             finally:
                 try:
                     await protocol.close()
                     transport.close()
-                except Exception:
+                except Exception:  # pragma: no cover
                     pass
 
 
