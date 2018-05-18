@@ -300,7 +300,7 @@ class EventPublisher(features.ServiceFeature):
         self._protocol: aioamqp.AmqpProtocol = None
         self._channel: aioamqp.channel.Channel = None
 
-    async def shutdown(self, *args):
+    async def shutdown(self, *_):
         LOGGER.info(f'Closing {self}')
 
         try:
