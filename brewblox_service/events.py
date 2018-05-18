@@ -324,7 +324,7 @@ class EventPublisher(features.ServiceFeature):
         try:
             await self._protocol.ensure_open()
         except aioamqp.exceptions.AioamqpException:
-            await self.close()
+            await self.shutdown()
             raise
 
     async def publish(self,
