@@ -11,18 +11,18 @@ class DummyFeature(features.ServiceFeature):
         super().__init__(app)
         self.name = name
 
-    async def start(app):
+    async def startup(app):
         pass
 
-    async def close(app):
+    async def shutdown(app):
         pass
 
 
 class OtherDummyFeature(features.ServiceFeature):
-    async def start(app):
+    async def startup(app):
         pass
 
-    async def close(app):
+    async def shutdown(app):
         pass
 
 

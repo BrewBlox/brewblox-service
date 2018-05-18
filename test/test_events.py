@@ -108,7 +108,7 @@ async def test_offline_listener(app, mocker):
     assert sub in listener._pending_pre_async
 
     # Can safely be called, but will be a no-op at this time
-    await listener.close()
+    await listener.shutdown()
 
 
 async def test_online_listener(app, client, mocker):
@@ -121,10 +121,10 @@ async def test_online_listener(app, client, mocker):
     sub = listener.subscribe('exchange', 'routing')
 
     # No-op, listener is not yet started
-    await listener.close()
+    await listener.shutdown()
 
     assert sub in listener._pending_pre_async
-    await listener.start(app)
+    await listener.startup(app)
     assert listener._pending_pre_async is None
 
     pending_subs = listener._pending.qsize()
@@ -133,8 +133,8 @@ async def test_online_listener(app, client, mocker):
     assert listener._pending.qsize() == pending_subs + 1
 
     # Safe for repeated calls
-    await listener.close()
-    await listener.close()
+    await listener.shutdown()
+    await listener.shutdown()
 
 
 async def test_offline_publisher(app):
@@ -148,7 +148,7 @@ async def test_online_publisher(app, client, mocker):
         events.EventPublisher(app)
 
     publisher = events.EventPublisher()
-    await publisher.start(app)
+    await publisher.startup(app)
 
     await publisher.publish('exchange', 'key', message=dict(key='val'))
     await publisher.publish('exchange', 'key', message=dict(key='val'))
@@ -224,7 +224,7 @@ async def test_listener_exceptions(app, client, protocol_mock, channel_mock, tra
     assert not listener._task.done()
 
     # Should be closed every time it was opened
-    await listener.close()
+    await listener.shutdown()
     assert protocol_mock.close.call_count == mocked_connect.call_count
     assert transport_mock.close.call_count == mocked_connect.call_count
 

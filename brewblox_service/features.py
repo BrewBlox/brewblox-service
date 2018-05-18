@@ -64,10 +64,10 @@ class ServiceFeature(ABC):
             app.on_cleanup.append(self.shutdown)
 
     async def startup(self, app: web.Application):
-        await self.start(app)
+        await self.start(app)  # pragma: no cover
 
     async def shutdown(self, app: web.Application):
-        await self.close(app)
+        await self.close(app)  # pragma: no cover
 
     # left in for backwards compatibility
     async def start(self, app: web.Application):
