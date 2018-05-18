@@ -2,7 +2,7 @@
 Registers and gets features added to Aiohttp by brewblox services.
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Type
 
 from aiohttp import web
@@ -58,15 +58,21 @@ def get(app: web.Application, feature_type: Type['ServiceFeature']=None, name: s
 
 class ServiceFeature(ABC):
 
-    def __init__(self, app: web.Application=None):
+    def __init__(self, app: web.Application):
         if app:
-            app.on_startup.append(self.start)
-            app.on_cleanup.append(self.close)
+            app.on_startup.append(self.startup)
+            app.on_cleanup.append(self.shutdown)
 
-    @abstractmethod
+    async def startup(self, app: web.Application):
+        await self.start(app)
+
+    async def shutdown(self, app: web.Application):
+        await self.close(app)
+
+    # left in for backwards compatibility
     async def start(self, app: web.Application):
         pass  # pragma: no cover
 
-    @abstractmethod
+    # left in for backwards compatibility
     async def close(self, app: web.Application):
         pass  # pragma: no cover

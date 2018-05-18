@@ -103,9 +103,6 @@ async def test_offline_listener(app, mocker):
     # Expected behaviour is for the listener to add functions to the app hooks
     listener = events.EventListener(app)
 
-    assert listener.start in app.on_startup
-    assert listener.close in app.on_cleanup
-
     # Subscriptions will not be declared yet - they're waiting for startup
     sub = listener.subscribe('exchange', 'routing')
     assert sub in listener._pending_pre_async
@@ -142,11 +139,6 @@ async def test_online_listener(app, client, mocker):
 
 async def test_offline_publisher(app):
     publisher = events.EventPublisher(app)
-
-    assert publisher.start in app.on_startup
-    assert publisher.close in app.on_cleanup
-
-    # with pytest.raises(ConnectionRefusedError):
     await publisher.publish('exchange', 'key', message=dict(key='val'))
 
 

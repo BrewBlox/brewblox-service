@@ -137,7 +137,7 @@ class EventListener(features.ServiceFeature):
     def __str__(self):
         return f'<{type(self).__name__} {self._host}>'
 
-    async def start(self, app: web.Application):
+    async def startup(self, app: web.Application):
         # Initialize the async queue now we know which loop we're using
         self._loop = app.loop
         self._pending = asyncio.Queue(loop=self._loop)
@@ -150,7 +150,7 @@ class EventListener(features.ServiceFeature):
 
         self._lazy_listen()
 
-    async def close(self, *args):
+    async def shutdown(self, *_):
         LOGGER.info(f'Closing {self}')
 
         try:
@@ -292,7 +292,7 @@ class EventPublisher(features.ServiceFeature):
     def __str__(self):
         return f'<{type(self).__name__} {self._host}>'
 
-    async def start(self, app: web.Application):
+    async def startup(self, app: web.Application):
         self._loop = app.loop
 
     def _reset(self):
@@ -300,7 +300,7 @@ class EventPublisher(features.ServiceFeature):
         self._protocol: aioamqp.AmqpProtocol = None
         self._channel: aioamqp.channel.Channel = None
 
-    async def close(self, *args):
+    async def shutdown(self, *args):
         LOGGER.info(f'Closing {self}')
 
         try:
