@@ -11,18 +11,26 @@ class DummyFeature(features.ServiceFeature):
         super().__init__(app)
         self.name = name
 
-    async def startup(app):
+    async def startup(self, app):
         pass
 
-    async def shutdown(app):
+    async def shutdown(self, app):
         pass
 
 
 class OtherDummyFeature(features.ServiceFeature):
-    async def startup(app):
+    async def startup(self, app):
         pass
 
-    async def shutdown(app):
+    async def shutdown(self, app):
+        pass
+
+
+class DeprecatedFeature(features.ServiceFeature):
+    async def start(self, app):
+        pass
+
+    async def close(self, app):
         pass
 
 
@@ -61,3 +69,7 @@ def test_get(app):
     # slagathor exists, but it's not a DummyFeature
     with pytest.raises(AssertionError):
         features.get(app, DummyFeature, 'slagathor')
+
+
+def test_name_deprecation(app):
+    DeprecatedFeature(app)
