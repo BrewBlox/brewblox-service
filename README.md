@@ -60,9 +60,9 @@ service.run(app)
 
 Many service features are application-scoped. Their lifecycle should span multiple requests, either because they are not request-driven, or because they manage asynchronous I/O operations (such as listening to AMQP messages).
 
-The `ServiceFeature` class offers an abstract base class for this behavior. Implementing classes should define `start(app)` and `close(app)` functions, and those will be automatically called when the application starts up and shuts down.
+The `ServiceFeature` class offers an abstract base class for this behavior. Implementing classes should define `startup(app)` and `shutdown(app)` functions, and those will be automatically called when the application starts up and shuts down.
 
-Both `start()` and `close()` are called in an async context, making them the async counterparts of `__init__()` and `__del__()` functions.
+Both `startup()` and `shutdown()` are called in an async context, making them the async counterparts of `__init__()` and `__del__()` functions.
 
 Features must be constructed after the app is created, but before it starts running. (`service.create_app()` and `service.run(app)`)
 
