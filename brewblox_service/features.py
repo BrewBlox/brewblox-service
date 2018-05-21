@@ -2,6 +2,7 @@
 Registers and gets features added to Aiohttp by brewblox services.
 """
 
+import warnings
 from abc import ABC
 from typing import Type
 
@@ -120,8 +121,8 @@ class ServiceFeature(ABC):
             callable(getattr(self, 'start', None)),
             callable(getattr(self, 'close', None))
         ]):
-            raise DeprecationWarning(
-                'start(app) and close(app) functions are deprecated. Use startup(app) and shutdown(app) instead')
+            message = 'start(app) and close(app) functions are deprecated. Use startup(app) and shutdown(app) instead'
+            warnings.warn(message)
 
         if app:
             app.on_startup.append(self.startup)

@@ -2,7 +2,9 @@
 Tests brewblox_service.features
 """
 
+from asynctest import CoroutineMock
 from brewblox_service import features
+
 import pytest
 
 
@@ -27,11 +29,11 @@ class OtherDummyFeature(features.ServiceFeature):
 
 
 class DeprecatedFeature(features.ServiceFeature):
-    async def start(self, app):
-        pass
 
-    async def close(self, app):
-        pass
+    def __init__(self, app):
+        self.start = CoroutineMock()
+        self.close = CoroutineMock()
+        super().__init__(app)
 
 
 def test_add(app):
@@ -71,5 +73,22 @@ def test_get(app):
         features.get(app, DummyFeature, 'slagathor')
 
 
-def test_name_deprecation(app):
-    DeprecatedFeature(app)
+async def test_name_deprecation(mocker, app, loop):
+    warn_spy = mocker.spy(features.warnings, 'warn')
+
+    debby = DeprecatedFeature(app)
+    assert warn_spy.call_count == 1
+
+    await debby.startup(app)
+    debby.start.assert_called_once_with(app)
+
+    await debby.shutdown(app)
+    debby.close.assert_called_once_with(app)
+
+
+async def test_lazy_feature(app, loop):
+    # Does not implement any meaningful functions
+    lazy = features.ServiceFeature(app)
+
+    await lazy.startup(app)
+    await lazy.shutdown(app)
