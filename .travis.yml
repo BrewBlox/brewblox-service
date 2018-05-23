@@ -21,25 +21,8 @@ before_deploy:
   && docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
 deploy:
-
-  # Deploy to PyPi on tagged commits
-  - provider: pypi
-    user: $PYPI_USER
-    password: $PYPI_PASSWORD
-    skip_cleanup: true
-    on:
-      tags: true
-
-  # Deploy dev version to PyPi on any push to an upstream development branch
-  - provider: pypi
-    user: $PYPI_USER
-    password: $PYPI_PASSWORD
-    skip_cleanup: true
-    on:
-      tags: false
-      repo: $GITHUB_REPO
-      all_branches: true
-      condition: $TRAVIS_BRANCH != master
+  # Note: Docker Hub deployment is intentionally done before PyPi deployment
+  # Docker Hub allows overwriting versions, PyPi does not
 
   # Deploy "latest" and version tag to Docker Hub on tagged commits
   - provider: script
@@ -69,6 +52,25 @@ deploy:
       --image rpi-docker
       --name "$DOCKER_REPO"
       --tags rpi-$TRAVIS_BRANCH
+    skip_cleanup: true
+    on:
+      tags: false
+      repo: $GITHUB_REPO
+      all_branches: true
+      condition: $TRAVIS_BRANCH != master
+
+  # Deploy to PyPi on tagged commits
+  - provider: pypi
+    user: $PYPI_USER
+    password: $PYPI_PASSWORD
+    skip_cleanup: true
+    on:
+      tags: true
+
+  # Deploy dev version to PyPi on any push to an upstream development branch
+  - provider: pypi
+    user: $PYPI_USER
+    password: $PYPI_PASSWORD
     skip_cleanup: true
     on:
       tags: false
