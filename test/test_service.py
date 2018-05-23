@@ -6,14 +6,23 @@ from unittest.mock import call
 
 import pytest
 
-from brewblox_service import service
+from brewblox_service import service, features
 
 TESTED = service.__name__
+
+
+class DummyFeature(features.ServiceFeature):
+    async def startup(self, app):
+        pass
+
+    async def shutdown(self, app):
+        pass
 
 
 @pytest.fixture
 async def app(app, mocker):
     app.router.add_static(prefix='/static', path='/usr')
+    features.add(app, DummyFeature(app))
     service.furnish(app)
     return app
 

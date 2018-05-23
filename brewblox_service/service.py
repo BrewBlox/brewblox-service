@@ -33,6 +33,7 @@ from typing import List
 import aiohttp_cors
 import aiohttp_swagger
 from aiohttp import web
+from brewblox_service import features
 
 LOGGER = logging.getLogger(__name__)
 routes = web.RouteTableDef()
@@ -206,7 +207,10 @@ def furnish(app: web.Application):
                                   contact='development@brewpi.com')
 
     for route in app.router.routes():
-        LOGGER.info(f'Registered [{route.method}] {route.resource}')
+        LOGGER.info(f'Endpoint [{route.method}] {route.resource}')
+
+    for name, impl in app.get(features.FEATURES_KEY, {}).items():
+        LOGGER.info(f'Feature [{name}] {impl}')
 
 
 def run(app: web.Application):
