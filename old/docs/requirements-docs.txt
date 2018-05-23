@@ -1,4 +1,0 @@
-# documentation requirements
-sphinx
-sphinx_rtd_theme
-sphinxcontrib-seqdiag
