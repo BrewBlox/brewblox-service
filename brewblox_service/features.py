@@ -2,8 +2,7 @@
 Registers and gets features added to Aiohttp by brewblox services.
 """
 
-import warnings
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Type
 
 from aiohttp import web
@@ -75,8 +74,9 @@ class ServiceFeature(ABC):
     Example class:
 
         import asyncio
+        import random
         from aiohttp import web
-        from brewblox_service import service
+        from brewblox_service import scheduler, service
         from brewblox_service.features import ServiceFeature
 
         class MyFeature(ServiceFeature):
@@ -87,25 +87,28 @@ class ServiceFeature(ABC):
 
             async def startup(self, app: web.Application):
                 # Schedule a long-running background task
-                self._task = app.loop.create_task(self._hello())
+                self._task = await scheduler.create_task(app, self._hello())
 
             async def shutdown(self, app: web.Application):
                 # Orderly cancel the background task
-                try:
-                    self._task.cancel()
-                    await self._task
-                except Exception:
-                    pass
+                await scheduler.cancel_task(app, self._task)
 
             async def _hello(self):
                 while True:
                     await asyncio.sleep(5)
-                    print('still here!')
+                    print(random.choice([
+                        'Hellooo',
+                        'Searching',
+                        'Sentry mode activated',
+                        'Is anyone there?',
+                        'Could you come over here?',
+                    ]))
 
     Example use:
 
         app = service.create_app(default_name='example')
 
+        scheduler.setup(app)
         greeter = MyFeature(app)
 
         service.furnish(app)
@@ -117,17 +120,11 @@ class ServiceFeature(ABC):
     """
 
     def __init__(self, app: web.Application):
-        if any([
-            callable(getattr(self, 'start', None)),
-            callable(getattr(self, 'close', None))
-        ]):
-            message = 'start(app) and close(app) functions are deprecated. Use startup(app) and shutdown(app) instead'
-            warnings.warn(message)
-
         if app:
             app.on_startup.append(self.startup)
             app.on_cleanup.append(self.shutdown)
 
+    @abstractmethod
     async def startup(self, app: web.Application):
         """Lifecycle hook for initializing the feature in an async context.
 
@@ -136,11 +133,9 @@ class ServiceFeature(ABC):
         If `app` in the ServiceFeature.__init__(app) call was not None,
         startup() will be called when Aiohttp starts running.
         """
+        pass  # pragma: no cover
 
-        # Attempt to fall back on old function name
-        if callable(getattr(self, 'start', None)):
-            await self.start(app)
-
+    @abstractmethod
     async def shutdown(self, app: web.Application):
         """Lifecycle hook for shutting down the feature before the event loop is closed.
 
@@ -149,7 +144,4 @@ class ServiceFeature(ABC):
         If `app` in the ServiceFeature.__init__(app) call was not None,
         shutdown() will be called when Aiohttp is closing, but before the event loop is closed.
         """
-
-        # Attempt to fall back on old function name
-        if callable(getattr(self, 'close', None)):
-            await self.close(app)
+        pass  # pragma: no cover
