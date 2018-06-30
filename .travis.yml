@@ -11,29 +11,28 @@ env:
     - DOCKER_REPO=brewblox/brewblox-service
     - GITHUB_REPO=BrewBlox/brewblox-service
 
-install: pip install tox brewblox-tools~=0.2.0
+install: pip install tox brewblox-tools~=0.3.0
 
 script: tox
 
 before_deploy:
-  bbt-distcopy .tox/dist/ docker/pkg/ rpi-docker/pkg/
+  bbt-distcopy .tox/dist/ docker/dist/
   && docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
   && docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
 deploy:
-  # Note: Docker Hub deployment is intentionally done before PyPi deployment
-  # Docker Hub allows overwriting versions, PyPi does not
-
   # Deploy "latest" and version tag to Docker Hub on tagged commits
   - provider: script
     script:
       bbt-deploy-docker
       --image docker
+      --file amd/Dockerfile
       --name "$DOCKER_REPO"
       --tags latest $(git describe --tags)
       &&
       bbt-deploy-docker
-      --image rpi-docker
+      --image docker
+      --file arm/Dockerfile
       --name "$DOCKER_REPO"
       --tags rpi-latest rpi-$(git describe --tags)
     skip_cleanup: true
@@ -45,11 +44,13 @@ deploy:
     script:
       bbt-deploy-docker
       --image docker
+      --file amd/Dockerfile
       --name "$DOCKER_REPO"
       --tags "$TRAVIS_BRANCH"
       &&
       bbt-deploy-docker
-      --image rpi-docker
+      --image docker
+      --file arm/Dockerfile
       --name "$DOCKER_REPO"
       --tags rpi-$TRAVIS_BRANCH
     skip_cleanup: true
@@ -59,21 +60,12 @@ deploy:
       all_branches: true
       condition: $TRAVIS_BRANCH != master
 
-  # Deploy to PyPi on tagged commits
+  # Deploy to PyPi on any push to an upstream branch
   - provider: pypi
     user: $PYPI_USER
     password: $PYPI_PASSWORD
+    skip_existing: true
     skip_cleanup: true
     on:
-      tags: true
-
-  # Deploy dev version to PyPi on any push to an upstream development branch
-  - provider: pypi
-    user: $PYPI_USER
-    password: $PYPI_PASSWORD
-    skip_cleanup: true
-    on:
-      tags: false
       repo: $GITHUB_REPO
       all_branches: true
-      condition: $TRAVIS_BRANCH != master
