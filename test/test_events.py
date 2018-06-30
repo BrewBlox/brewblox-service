@@ -8,9 +8,10 @@ from datetime import timedelta
 from unittest.mock import Mock, call
 
 import aioamqp
-import pytest
 from asynctest import CoroutineMock
-from brewblox_service import events
+from brewblox_service import events, scheduler
+
+import pytest
 
 TESTED = events.__name__
 
@@ -54,6 +55,7 @@ def mocked_connect(mocker, protocol_mock, transport_mock):
 @pytest.fixture
 async def app(app, mocker, loop, mocked_connect):
     """App with events enabled"""
+    scheduler.setup(app)
     events.setup(app)
     mocker.patch(TESTED + '.PENDING_WAIT_TIMEOUT', timedelta(microseconds=10))
     mocker.patch(TESTED + '.RECONNECT_INTERVAL', timedelta(microseconds=10))
@@ -108,7 +110,7 @@ async def test_offline_listener(app, mocker):
     assert sub in listener._pending_pre_async
 
     # Can safely be called, but will be a no-op at this time
-    await listener.shutdown()
+    await listener.shutdown(app)
 
 
 async def test_online_listener(app, client, mocker):
@@ -121,7 +123,7 @@ async def test_online_listener(app, client, mocker):
     sub = listener.subscribe('exchange', 'routing')
 
     # No-op, listener is not yet started
-    await listener.shutdown()
+    await listener.shutdown(app)
 
     assert sub in listener._pending_pre_async
     await listener.startup(app)
@@ -133,13 +135,14 @@ async def test_online_listener(app, client, mocker):
     assert listener._pending.qsize() == pending_subs + 1
 
     # Safe for repeated calls
-    await listener.shutdown()
-    await listener.shutdown()
+    await listener.shutdown(app)
+    await listener.shutdown(app)
 
 
 async def test_offline_publisher(app):
     publisher = events.EventPublisher(app)
-    await publisher.publish('exchange', 'key', message=dict(key='val'))
+    with pytest.raises(RuntimeError):
+        await publisher.publish('exchange', 'key', message=dict(key='val'))
 
 
 async def test_online_publisher(app, client, mocker):
@@ -224,7 +227,7 @@ async def test_listener_exceptions(app, client, protocol_mock, channel_mock, tra
     assert not listener._task.done()
 
     # Should be closed every time it was opened
-    await listener.shutdown()
+    await listener.shutdown(app)
     assert protocol_mock.close.call_count == mocked_connect.call_count
     assert transport_mock.close.call_count == mocked_connect.call_count
 

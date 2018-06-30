@@ -62,3 +62,17 @@ def test_get(app):
     # slagathor exists, but it's not a DummyFeature
     with pytest.raises(AssertionError):
         features.get(app, DummyFeature, 'slagathor')
+
+
+async def test_app_property(app, client):
+    dummy = DummyFeature(None, 'dummy')
+    assert dummy.app is None
+
+    await dummy.startup(app)
+    assert dummy.app == app
+
+    await dummy.shutdown(app)
+    assert dummy.app is None
+
+    with pytest.raises(AttributeError):
+        dummy.app = app

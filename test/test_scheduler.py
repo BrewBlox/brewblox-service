@@ -38,3 +38,6 @@ async def test_create_cancel(app, client):
 
     # Create and forget
     await scheduler.create_task(app, do(asyncio.Event()))
+
+    # Cancelling None does not croak
+    await scheduler.cancel_task(app, None)

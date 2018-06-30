@@ -3,6 +3,7 @@ Registers and gets features added to Aiohttp by brewblox services.
 """
 
 from abc import ABC, abstractmethod
+from functools import partial, update_wrapper
 from typing import Type
 
 from aiohttp import web
@@ -120,9 +121,44 @@ class ServiceFeature(ABC):
     """
 
     def __init__(self, app: web.Application):
+        self.__active_app: web.Application = None
+
+        # Wrap the startup and shutdown functions defined by the child class.
+        # This allows us to do some feature management (eg. setting self.app),
+        # regardless of whether the function was called manually, or by an Aiohttp hook
+        self.startup = self.__wrap(self.__startup_wrapper, self.startup)
+        self.shutdown = self.__wrap(self.__shutdown_wrapper, self.shutdown)
+
         if app:
             app.on_startup.append(self.startup)
             app.on_cleanup.append(self.shutdown)
+
+    @property
+    def app(self) -> web.Application:
+        """Currently active `web.Application`
+
+        Returns:
+            web.Application: The current app. None if the app is not running.
+        """
+        return self.__active_app
+
+    @app.setter
+    def app(self, new_app: web.Application):
+        raise AttributeError('read-only property')
+
+    @staticmethod
+    def __wrap(wrapper, wrapped):
+        wrapper_func = partial(wrapper, wrapped)
+        update_wrapper(wrapper_func, wrapped)
+        return wrapper_func
+
+    async def __startup_wrapper(self, wrapped, app: web.Application):
+        self.__active_app = app
+        await wrapped(app)
+
+    async def __shutdown_wrapper(self, wrapped, app: web.Application=None):
+        await wrapped(app or self.app)
+        self.__active_app = None
 
     @abstractmethod
     async def startup(self, app: web.Application):
@@ -132,16 +168,22 @@ class ServiceFeature(ABC):
 
         If `app` in the ServiceFeature.__init__(app) call was not None,
         startup() will be called when Aiohttp starts running.
+
+        When this function is called, either by Aiohttp, or manually,
+        `self.app` will be set to the current application.
         """
         pass  # pragma: no cover
 
     @abstractmethod
-    async def shutdown(self, app: web.Application):
+    async def shutdown(self, app: web.Application=None):
         """Lifecycle hook for shutting down the feature before the event loop is closed.
 
         Subclasses are expected to override this function.
 
         If `app` in the ServiceFeature.__init__(app) call was not None,
         shutdown() will be called when Aiohttp is closing, but before the event loop is closed.
+
+        When this function is called, either by Aiohttp, or manually,
+        `self.app` will be set to None.
         """
         pass  # pragma: no cover

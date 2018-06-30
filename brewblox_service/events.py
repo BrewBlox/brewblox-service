@@ -3,10 +3,13 @@ Offers event publishing and subscription for service implementations.
 
 Example use:
 
+    from brewblox_service import scheduler, events
+
+    scheduler.setup(app)
     events.setup(app)
 
     async def on_message(subscription, key, message):
-        logging.info(f'Message from {subscription}: {key} = {message} ({type(message)})')
+        print(f'Message from {subscription}: {key} = {message} ({type(message)})')
 
     listener = events.get_listener(app)
     listener.subscribe('brewblox', 'controller', on_message=on_message)
@@ -26,7 +29,7 @@ from typing import Callable, List, Union
 
 import aioamqp
 from aiohttp import web
-from brewblox_service import brewblox_logger, features
+from brewblox_service import brewblox_logger, features, scheduler
 
 LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
@@ -131,7 +134,6 @@ class EventListener(features.ServiceFeature):
         self._pending: asyncio.Queue = None
         self._subscriptions: List[EventSubscription] = []
 
-        self._loop: asyncio.BaseEventLoop = None
         self._task: asyncio.Task = None
 
     def __str__(self):
@@ -139,8 +141,7 @@ class EventListener(features.ServiceFeature):
 
     async def startup(self, app: web.Application):
         # Initialize the async queue now we know which loop we're using
-        self._loop = app.loop
-        self._pending = asyncio.Queue(loop=self._loop)
+        self._pending = asyncio.Queue(loop=app.loop)
 
         # Transfer all subscriptions that were made before the event loop started
         [self._pending.put_nowait(s) for s in self._pending_pre_async]
@@ -150,16 +151,10 @@ class EventListener(features.ServiceFeature):
 
         self._lazy_listen()
 
-    async def shutdown(self, *_):
+    async def shutdown(self, app: web.Application):
         LOGGER.info(f'Closing {self}')
-
-        try:
-            self._task.cancel()
-            await self._task
-        except Exception:
-            pass
-        finally:
-            self._task = None
+        await scheduler.cancel_task(app, self._task)
+        self._task = None
 
     def subscribe(self,
                   exchange_name: str,
@@ -198,16 +193,16 @@ class EventListener(features.ServiceFeature):
         This function is a noop if any of the preconditions is not met.
 
         Preconditions are:
-        * An asyncio eventloop is available (self._loop)
+        * The application is running (self.app)
         * The task is not already running
         * There are subscriptions: either pending, or active
         """
         if all([
-            self._loop,
-            not self._task,
+            self.app,
+            not self._task or self._task.done(),
             self._subscriptions or (self._pending and not self._pending.empty()),
         ]):
-            self._task = self._loop.create_task(self._listen())
+            self._task = self.app.loop.create_task(self._listen())
 
     async def _listen(self):
         retrying = False
@@ -216,7 +211,7 @@ class EventListener(features.ServiceFeature):
             try:
                 transport, protocol = await aioamqp.connect(
                     host=self._host,
-                    loop=self._loop
+                    loop=self.app.loop
                 )
 
                 channel = await protocol.channel()
@@ -281,7 +276,6 @@ class EventPublisher(features.ServiceFeature):
     def __init__(self, app: web.Application=None, host: str=EVENTBUS_HOST):
         super().__init__(app)
 
-        self._loop: asyncio.BaseEventLoop = None
         self._host: str = host
         self._reset()
 
@@ -292,15 +286,12 @@ class EventPublisher(features.ServiceFeature):
     def __str__(self):
         return f'<{type(self).__name__} {self._host}>'
 
-    async def startup(self, app: web.Application):
-        self._loop = app.loop
-
     def _reset(self):
         self._transport = None
         self._protocol: aioamqp.AmqpProtocol = None
         self._channel: aioamqp.channel.Channel = None
 
-    async def shutdown(self, *_):
+    async def _close(self):
         LOGGER.info(f'Closing {self}')
 
         try:
@@ -311,12 +302,18 @@ class EventPublisher(features.ServiceFeature):
         finally:
             self._reset()
 
+    async def startup(self, *_):
+        pass
+
+    async def shutdown(self, *_):
+        await self._close()
+
     async def _ensure_channel(self):
         # Lazy connect
         if not self.connected:
             self._transport, self._protocol = await aioamqp.connect(
                 host=self._host,
-                loop=self._loop
+                loop=self.app.loop
             )
             self._channel = await self._protocol.channel()
 
@@ -324,7 +321,7 @@ class EventPublisher(features.ServiceFeature):
         try:
             await self._protocol.ensure_open()
         except aioamqp.exceptions.AioamqpException:
-            await self.shutdown()
+            await self._close()
             raise
 
     async def publish(self,
@@ -332,6 +329,9 @@ class EventPublisher(features.ServiceFeature):
                       routing: str,
                       message: Union[str, dict]='',
                       exchange_type: ExchangeType_='topic'):
+        if not self.app:
+            raise RuntimeError(f'{self} must be started before it can publish')
+
         try:
             await self._ensure_channel()
         except Exception:
