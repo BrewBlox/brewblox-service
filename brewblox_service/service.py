@@ -33,28 +33,10 @@ from typing import List
 import aiohttp_cors
 import aiohttp_swagger
 from aiohttp import web
-from brewblox_service import features
+from brewblox_service import brewblox_logger, features
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
-
-
-@routes.get('/_service/status')
-async def healthcheck(request: web.Request) -> web.Response:
-    """
-    ---
-    tags:
-    - Service
-    summary: health check
-    description: Returns service health.
-    operationId: _service.status
-    produces:
-    - application/json
-    responses:
-    "200":
-        description: successful operation
-    """
-    return web.json_response({'status': 'ok'})
 
 
 def _init_logging(args: argparse.Namespace):
@@ -90,7 +72,8 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
     The parser allows calling code to add additional arguments before using it in create_app()
 
     Args:
-        default_name (str): default value for the --name commandline argument.
+        default_name (str):
+            default value for the --name commandline argument.
 
     Returns:
         argparse.ArgumentParser: a Python ArgumentParser with defaults set.
@@ -164,9 +147,11 @@ def furnish(app: web.Application):
     and must be called immediately prior to `run(app)`.
 
     Args:
-        app (web.Application): The Aiohttp Application as created by `create_app()`
+        app (web.Application):
+            The Aiohttp Application as created by `create_app()`
     """
-    prefix = '/' + app['config']['name'].lstrip('/')
+    app_name = app['config']['name']
+    prefix = '/' + app_name.lstrip('/')
     app.router.add_routes(routes)
 
     # Configure default CORS settings.
@@ -202,8 +187,8 @@ def furnish(app: web.Application):
     aiohttp_swagger.setup_swagger(app,
                                   swagger_url=prefix + '/api/doc',
                                   description='',
-                                  title='Brewblox Service',
-                                  api_version='0.3.0',
+                                  title=f'Brewblox Service "{app_name}"',
+                                  api_version='0.0',
                                   contact='development@brewpi.com')
 
     for route in app.router.routes():
@@ -219,10 +204,29 @@ def run(app: web.Application):
     This function will block indefinitely until the application is shut down.
 
     Args:
-        app (web.Application): The Aiohttp Application as created by `create_app()`
+        app (web.Application):
+            The Aiohttp Application as created by `create_app()`
     """
     host = app['config']['host']
     port = app['config']['port']
 
     # starts app. run_app() will automatically start the async context.
     web.run_app(app, host=host, port=port)
+
+
+@routes.get('/_service/status')
+async def healthcheck(request: web.Request) -> web.Response:
+    """
+    ---
+    tags:
+    - Service
+    summary: health check
+    description: Returns service health.
+    operationId: _service.status
+    produces:
+    - application/json
+    responses:
+    "200":
+        description: successful operation
+    """
+    return web.json_response({'status': 'ok'})

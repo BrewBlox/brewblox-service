@@ -3,10 +3,13 @@ Offers event publishing and subscription for service implementations.
 
 Example use:
 
+    from brewblox_service import scheduler, events
+
+    scheduler.setup(app)
     events.setup(app)
 
     async def on_message(subscription, key, message):
-        logging.info(f'Message from {subscription}: {key} = {message} ({type(message)})')
+        print(f'Message from {subscription}: {key} = {message} ({type(message)})')
 
     listener = events.get_listener(app)
     listener.subscribe('brewblox', 'controller', on_message=on_message)
@@ -22,16 +25,16 @@ import asyncio
 import json
 from concurrent.futures import CancelledError, TimeoutError
 from datetime import timedelta
-from typing import Callable, List, Union
+from typing import Callable, Coroutine, List, Union
 
 import aioamqp
 from aiohttp import web
-from brewblox_service import brewblox_logger, features
+from brewblox_service import brewblox_logger, features, scheduler
 
 LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
 
-EVENT_CALLBACK_ = Callable[['EventSubscription', str, Union[dict, str]], None]
+EVENT_CALLBACK_ = Callable[['EventSubscription', str, Union[dict, str]], Coroutine]
 ExchangeType_ = str
 
 EVENTBUS_HOST = 'eventbus'
@@ -63,6 +66,16 @@ async def _default_on_message(sub: 'EventSubscription', key: str, message: Union
 
 
 class EventSubscription():
+    """
+    Subscription class for receiving AMQP messages.
+
+    This class should not be instantiated directly.
+    To subscribe to AMQP messages, use `EventListener.subscribe()`
+
+    The `on_message` property can safely be changed while the subscription is active.
+    It will be used for the next received message.
+    """
+
     def __init__(self,
                  exchange_name: str,
                  routing: str,
@@ -120,10 +133,22 @@ class EventSubscription():
 
 
 class EventListener(features.ServiceFeature):
-    def __init__(self, app: web.Application=None, host: str=EVENTBUS_HOST):
+    """
+    Allows subscribing to AMQP messages published to a central event bus.
+
+    `EventListener` will maintain a persistent connection to the AMQP host,
+    and ensures that all subscriptions remain valid if the connection is lost and reestablished.
+    """
+
+    def __init__(self,
+                 app: web.Application,
+                 host: str=EVENTBUS_HOST,
+                 port: int=EVENTBUS_PORT
+                 ):
         super().__init__(app)
 
         self._host: str = host
+        self._port: int = port
 
         # Asyncio queues need a context loop
         # We'll initialize self._pending when we have one
@@ -131,83 +156,27 @@ class EventListener(features.ServiceFeature):
         self._pending: asyncio.Queue = None
         self._subscriptions: List[EventSubscription] = []
 
-        self._loop: asyncio.BaseEventLoop = None
         self._task: asyncio.Task = None
 
     def __str__(self):
-        return f'<{type(self).__name__} {self._host}>'
-
-    async def startup(self, app: web.Application):
-        # Initialize the async queue now we know which loop we're using
-        self._loop = app.loop
-        self._pending = asyncio.Queue(loop=self._loop)
-
-        # Transfer all subscriptions that were made before the event loop started
-        [self._pending.put_nowait(s) for s in self._pending_pre_async]
-
-        # We won't be needing this anymore
-        self._pending_pre_async = None
-
-        self._lazy_listen()
-
-    async def shutdown(self, *_):
-        LOGGER.info(f'Closing {self}')
-
-        try:
-            self._task.cancel()
-            await self._task
-        except Exception:
-            pass
-        finally:
-            self._task = None
-
-    def subscribe(self,
-                  exchange_name: str,
-                  routing: str,
-                  exchange_type: ExchangeType_='topic',
-                  on_message: EVENT_CALLBACK_=None):
-        """Adds a new event subscription to the listener.
-
-        Actual queue declaration to the remote message server is done when connected.
-        If the listener is not currently connected, it defers declaration.
-
-        on_message(queue, key, message) can be specified.
-        If the event was in JSON, message is a dict. Otherwise it is a string
-
-        If on_message() is not set, it will default to logging the message.
-        """
-        sub = EventSubscription(
-            exchange_name,
-            routing,
-            exchange_type,
-            on_message=on_message
-        )
-
-        if self._pending is not None:
-            self._pending.put_nowait(sub)
-        else:
-            self._pending_pre_async.append(sub)
-            LOGGER.info(f'Deferred event bus subscription: [{sub}]')
-
-        self._lazy_listen()
-        return sub
+        return f'<{type(self).__name__} for "{self._host}">'
 
     def _lazy_listen(self):
         """
         Ensures that the listener task only runs when actually needed.
-        This function is a noop if any of the preconditions is not met.
+        This function is a no-op if any of the preconditions is not met.
 
         Preconditions are:
-        * An asyncio eventloop is available (self._loop)
+        * The application is running (self.app.loop)
         * The task is not already running
         * There are subscriptions: either pending, or active
         """
         if all([
-            self._loop,
-            not self._task,
+            self.app.loop,
+            not self._task or self._task.done(),
             self._subscriptions or (self._pending and not self._pending.empty()),
         ]):
-            self._task = self._loop.create_task(self._listen())
+            self._task = self.app.loop.create_task(self._listen())
 
     async def _listen(self):
         retrying = False
@@ -216,7 +185,8 @@ class EventListener(features.ServiceFeature):
             try:
                 transport, protocol = await aioamqp.connect(
                     host=self._host,
-                    loop=self._loop
+                    port=self._port,
+                    loop=self.app.loop
                 )
 
                 channel = await protocol.channel()
@@ -272,17 +242,98 @@ class EventListener(features.ServiceFeature):
                 except Exception:  # pragma: no cover
                     pass
 
+    async def startup(self, app: web.Application):
+        # Initialize the async queue now we know which loop we're using
+        self._pending = asyncio.Queue(loop=app.loop)
+
+        # Transfer all subscriptions that were made before the event loop started
+        [self._pending.put_nowait(s) for s in self._pending_pre_async]
+
+        # We won't be needing this anymore
+        self._pending_pre_async = None
+
+        self._lazy_listen()
+
+    async def shutdown(self, app: web.Application):
+        LOGGER.info(f'Closing {self}')
+        await scheduler.cancel_task(app, self._task)
+        self._task = None
+
+    def subscribe(self,
+                  exchange_name: str,
+                  routing: str,
+                  exchange_type: ExchangeType_='topic',
+                  on_message: EVENT_CALLBACK_=None
+                  ) -> EventSubscription:
+        """Adds a new event subscription to the listener.
+
+        Actual queue declaration to the remote message server is done when connected.
+        If the listener is not currently connected, it defers declaration.
+
+        All existing subscriptions are redeclared on the remote if `EventListener`
+        loses and recreates the connection.
+
+        Args:
+            exchange_name (str):
+                Name of the AMQP exchange. Messages are always published to a specific exchange.
+
+            routing (str):
+                Filter messages passing through the exchange.
+                A routing key is a '.'-separated string, and accepts '#' and '*' wildcards.
+
+            exchange_type (ExchangeType_, optional):
+                If the exchange does not yet exist, it will be created with this type.
+                Default is `topic`, acceptable values are `topic`, `fanout`, or `direct`.
+
+            on_message (EVENT_CALLBACK_, optional):
+                The function to be called when a new message is received.
+                If `on_message` is none, it will default to logging the message.
+
+        Returns:
+            EventSubscription:
+                The newly created subscription.
+                This value can safely be discarded: EventListener keeps its own reference.
+        """
+        sub = EventSubscription(
+            exchange_name,
+            routing,
+            exchange_type,
+            on_message=on_message
+        )
+
+        if self._pending is not None:
+            self._pending.put_nowait(sub)
+        else:
+            self._pending_pre_async.append(sub)
+            LOGGER.info(f'Deferred event bus subscription: [{sub}]')
+
+        self._lazy_listen()
+        return sub
 
 ##############################################################################
 # Outgoing events
 ##############################################################################
 
+
 class EventPublisher(features.ServiceFeature):
-    def __init__(self, app: web.Application=None, host: str=EVENTBUS_HOST):
+    """
+    Allows publishing AMQP messages to a central eventbus.
+
+    `EventPublisher` is associated with a single eventbus address,
+    but will only create a connection when attempting to publish.
+
+    Connections are re-used for subsequent `publish()` calls.
+    """
+
+    def __init__(self,
+                 app: web.Application,
+                 host: str=EVENTBUS_HOST,
+                 port: int=EVENTBUS_PORT
+                 ):
         super().__init__(app)
 
-        self._loop: asyncio.BaseEventLoop = None
         self._host: str = host
+        self._port: int = port
         self._reset()
 
     @property
@@ -290,17 +341,14 @@ class EventPublisher(features.ServiceFeature):
         return self._transport and self._protocol and self._channel
 
     def __str__(self):
-        return f'<{type(self).__name__} {self._host}>'
-
-    async def startup(self, app: web.Application):
-        self._loop = app.loop
+        return f'<{type(self).__name__} for "{self._host}">'
 
     def _reset(self):
-        self._transport = None
+        self._transport: asyncio.Transport = None
         self._protocol: aioamqp.AmqpProtocol = None
         self._channel: aioamqp.channel.Channel = None
 
-    async def shutdown(self, *_):
+    async def _close(self):
         LOGGER.info(f'Closing {self}')
 
         try:
@@ -312,26 +360,64 @@ class EventPublisher(features.ServiceFeature):
             self._reset()
 
     async def _ensure_channel(self):
-        # Lazy connect
         if not self.connected:
             self._transport, self._protocol = await aioamqp.connect(
                 host=self._host,
-                loop=self._loop
+                port=self._port,
+                loop=self.app.loop
             )
             self._channel = await self._protocol.channel()
 
-        # Assert connection
         try:
             await self._protocol.ensure_open()
         except aioamqp.exceptions.AioamqpException:
-            await self.shutdown()
+            await self._close()
             raise
+
+    async def startup(self, *_):
+        pass  # Connections are created when attempting to publish
+
+    async def shutdown(self, *_):
+        await self._close()
 
     async def publish(self,
                       exchange: str,
                       routing: str,
-                      message: Union[str, dict]='',
+                      message: Union[str, dict],
                       exchange_type: ExchangeType_='topic'):
+        """
+        Publish a new event message.
+
+        Connections are created automatically when calling `publish()`,
+        and will attempt to reconnect if connection was lost.
+
+        For more information on publishing AMQP messages,
+        see https://www.rabbitmq.com/tutorials/tutorial-three-python.html
+
+        Args:
+            exchange (str):
+                The AMQP message exchange to publish the message to.
+                A new exchange will be created if it does not yet exist.
+
+            routing (str):
+                The routing identification with which the message should be published.
+                Subscribers use routing information for fine-grained filtering.
+                Routing can be expressed as a '.'-separated path.
+
+            message (Union[str, dict]):
+                The message body. It will be serialized before transmission.
+
+            exchange_type (ExchangeType_, optional):
+                When publishing to a previously undeclared exchange, it will be created.
+                `exchange_type` defines how the exchange distributes messages between subscribers.
+                The default is 'topic', and acceptable values are: 'topic', 'direct', or 'fanout'.
+
+        Raises:
+            aioamqp.exceptions.AioamqpException:
+                * Failed to connect to AMQP host
+                * Failed to send message
+                * `exchange` already exists, but has a different `exchange_type`
+        """
         try:
             await self._ensure_channel()
         except Exception:
