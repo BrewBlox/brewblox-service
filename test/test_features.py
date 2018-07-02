@@ -2,14 +2,13 @@
 Tests brewblox_service.features
 """
 
-from brewblox_service import features
-
 import pytest
+from brewblox_service import features
 
 
 class DummyFeature(features.ServiceFeature):
-    def __init__(self, app, name: str=None):
-        super().__init__(app)
+    def __init__(self, app, name: str=None, *args, **kwargs):
+        super().__init__(app, *args, **kwargs)
         self.name = name
 
     async def startup(self, app):
@@ -50,11 +49,11 @@ def test_get(app):
     features.add(app, OtherDummyFeature(app), 'slagathor')
 
     assert features.get(app, DummyFeature).name == 'dummy'
-    assert features.get(app, name='jimmy').name == 'jimmy'
-    assert features.get(app, DummyFeature, name='jimmy').name == 'jimmy'
+    assert features.get(app, key='jimmy').name == 'jimmy'
+    assert features.get(app, DummyFeature, key='jimmy').name == 'jimmy'
 
     with pytest.raises(KeyError):
-        features.get(app, name='holy grail')
+        features.get(app, key='holy grail')
 
     with pytest.raises(AssertionError):
         features.get(app)
@@ -65,14 +64,8 @@ def test_get(app):
 
 
 async def test_app_property(app, client):
-    dummy = DummyFeature(None, 'dummy')
-    assert dummy.app is None
-
-    await dummy.startup(app)
+    dummy = DummyFeature(app, 'dummy', startup=features.Startup.MANUAL)
     assert dummy.app == app
-
-    await dummy.shutdown(app)
-    assert dummy.app is None
 
     with pytest.raises(AttributeError):
         dummy.app = app

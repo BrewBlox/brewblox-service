@@ -5,9 +5,8 @@ Tests brewblox_service.scheduler
 
 import asyncio
 
-from brewblox_service import scheduler
-
 import pytest
+from brewblox_service import scheduler
 
 TESTED = scheduler.__name__
 
@@ -41,3 +40,16 @@ async def test_create_cancel(app, client):
 
     # Cancelling None does not croak
     await scheduler.cancel_task(app, None)
+
+
+async def test_cleanup(app, client):
+    async def dummy():
+        pass
+
+    sched = scheduler.get_scheduler(app)
+    start_count = len(sched._tasks)
+    task = await scheduler.create_task(app, dummy())
+    await asyncio.sleep(0.01)
+
+    assert task.done()
+    assert len(sched._tasks) == start_count

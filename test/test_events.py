@@ -8,10 +8,9 @@ from datetime import timedelta
 from unittest.mock import Mock, call
 
 import aioamqp
+import pytest
 from asynctest import CoroutineMock
 from brewblox_service import events, scheduler
-
-import pytest
 
 TESTED = events.__name__
 
@@ -114,12 +113,7 @@ async def test_offline_listener(app, mocker):
 
 
 async def test_online_listener(app, client, mocker):
-    # The client fixture has started running the app in the event loop
-    # We'll need to start explicitly
-    with pytest.raises(RuntimeError):
-        events.EventListener(app)
-
-    listener = events.EventListener()
+    listener = events.EventListener(app)
     sub = listener.subscribe('exchange', 'routing')
 
     # No-op, listener is not yet started
@@ -141,16 +135,12 @@ async def test_online_listener(app, client, mocker):
 
 async def test_offline_publisher(app):
     publisher = events.EventPublisher(app)
-    with pytest.raises(RuntimeError):
-        await publisher.publish('exchange', 'key', message=dict(key='val'))
+    await publisher.startup(app)
+    await publisher.publish('exchange', 'key', message=dict(key='val'))
 
 
 async def test_online_publisher(app, client, mocker):
-    # Can't setup while running
-    with pytest.raises(RuntimeError):
-        events.EventPublisher(app)
-
-    publisher = events.EventPublisher()
+    publisher = events.EventPublisher(app)
     await publisher.startup(app)
 
     await publisher.publish('exchange', 'key', message=dict(key='val'))
