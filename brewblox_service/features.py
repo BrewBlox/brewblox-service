@@ -206,11 +206,12 @@ class ServiceFeature(ABC):
 
         Subclasses are expected to override this function.
 
-        If `app` in the ServiceFeature.__init__(app) call was not None,
-        startup() will be called when Aiohttp starts running.
+        Depending on the `startup` argument in `__init__()`,
+        `startup()` will be called when Aiohttp starts running.
 
-        When this function is called, either by Aiohttp, or manually,
-        `self.app` will be set to the current application.
+        Args:
+            app (web.Application):
+                Current Aiohttp application.
         """
         pass  # pragma: no cover
 
@@ -220,10 +221,11 @@ class ServiceFeature(ABC):
 
         Subclasses are expected to override this function.
 
-        If `app` in the ServiceFeature.__init__(app) call was not None,
-        shutdown() will be called when Aiohttp is closing, but before the event loop is closed.
+        Depending on the `startup` argument in `__init__()`,
+        `shutdown()` will be called when Aiohttp starts running.
 
-        When this function is called, either by Aiohttp, or manually,
-        `self.app` will be set to None.
+        Args:
+            app (web.Application):
+                Current Aiohttp application.
         """
         pass  # pragma: no cover

@@ -7,8 +7,8 @@ from brewblox_service import features
 
 
 class DummyFeature(features.ServiceFeature):
-    def __init__(self, app, name: str=None, manual_startup=False):
-        super().__init__(app, manual_startup)
+    def __init__(self, app, name: str=None, *args, **kwargs):
+        super().__init__(app, *args, **kwargs)
         self.name = name
 
     async def startup(self, app):
@@ -64,7 +64,7 @@ def test_get(app):
 
 
 async def test_app_property(app, client):
-    dummy = DummyFeature(app, 'dummy', True)
+    dummy = DummyFeature(app, 'dummy', startup=features.Startup.MANUAL)
     assert dummy.app == app
 
     with pytest.raises(AttributeError):
