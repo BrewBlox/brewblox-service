@@ -1,4 +1,4 @@
-FROM resin/raspberry-pi-python:3.6
+FROM resin/raspberrypi3-python:3.6
 
 EXPOSE 5000
 WORKDIR /app
