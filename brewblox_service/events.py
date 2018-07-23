@@ -29,6 +29,7 @@ from typing import Callable, Coroutine, List, Union
 
 import aioamqp
 from aiohttp import web
+
 from brewblox_service import brewblox_logger, features, scheduler
 
 LOGGER = brewblox_logger(__name__)
@@ -37,8 +38,6 @@ routes = web.RouteTableDef()
 EVENT_CALLBACK_ = Callable[['EventSubscription', str, Union[dict, str]], Coroutine]
 ExchangeType_ = str
 
-EVENTBUS_HOST = 'eventbus'
-EVENTBUS_PORT = 5672
 RECONNECT_INTERVAL = timedelta(seconds=1)
 PENDING_WAIT_TIMEOUT = timedelta(seconds=5)
 
@@ -142,13 +141,13 @@ class EventListener(features.ServiceFeature):
 
     def __init__(self,
                  app: web.Application,
-                 host: str=EVENTBUS_HOST,
-                 port: int=EVENTBUS_PORT
+                 host: str=None,
+                 port: int=None
                  ):
         super().__init__(app)
 
-        self._host: str = host
-        self._port: int = port
+        self._host: str = host or app['config']['eventbus_host']
+        self._port: int = port or app['config']['eventbus_port']
 
         # Asyncio queues need a context loop
         # We'll initialize self._pending when we have one
@@ -327,13 +326,13 @@ class EventPublisher(features.ServiceFeature):
 
     def __init__(self,
                  app: web.Application,
-                 host: str=EVENTBUS_HOST,
-                 port: int=EVENTBUS_PORT
+                 host: str=None,
+                 port: int=None
                  ):
         super().__init__(app)
 
-        self._host: str = host
-        self._port: int = port
+        self._host: str = host or app['config']['eventbus_host']
+        self._port: int = port or app['config']['eventbus_port']
         self._reset()
 
     @property

@@ -26,17 +26,21 @@ def app_config() -> dict:
         'port': 1234,
         'debug': False,
         'output': None,
+        'eventbus_host': 'eventbus',
+        'eventbus_port': 5672,
     }
 
 
 @pytest.fixture
 def sys_args(app_config) -> list:
-    return [
+    return [str(v) for v in [
         'app_name',
         '--name', app_config['name'],
         '--host', app_config['host'],
-        '--port', str(app_config['port']),
-    ]
+        '--port', app_config['port'],
+        '--eventbus-host', app_config['eventbus_host'],
+        '--eventbus-port', app_config['eventbus_port'],
+    ]]
 
 
 @pytest.fixture

@@ -33,6 +33,7 @@ from typing import List
 import aiohttp_cors
 import aiohttp_swagger
 from aiohttp import web
+
 from brewblox_service import brewblox_logger, features
 
 LOGGER = brewblox_logger(__name__)
@@ -79,7 +80,7 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
         argparse.ArgumentParser: a Python ArgumentParser with defaults set.
 
     """
-    argparser = argparse.ArgumentParser()
+    argparser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     argparser.add_argument('-H', '--host',
                            help='Host to which the app binds. [%(default)s]',
                            default='0.0.0.0')
@@ -95,6 +96,13 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
     argparser.add_argument('--debug',
                            help='Run the app in debug mode. [%(default)s]',
                            action='store_true')
+    argparser.add_argument('--eventbus-host',
+                           help='Hostname at which the eventbus can be reached [%(default)s]',
+                           default='eventbus')
+    argparser.add_argument('--eventbus-port',
+                           help='Port at which the eventbus can be reached [%(default)s]',
+                           default=5672,
+                           type=int)
     return argparser
 
 
