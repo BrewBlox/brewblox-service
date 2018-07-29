@@ -81,9 +81,9 @@ def get(app: web.Application,
     if not key:
         raise AssertionError('No feature identifier provided')
 
-    found = app.get(FEATURES_KEY, {}).get(key)
-
-    if not found:
+    try:
+        found = app[FEATURES_KEY][key]
+    except KeyError:
         raise KeyError(f'No feature found for "{key}"')
 
     if feature_type and not isinstance(found, feature_type):

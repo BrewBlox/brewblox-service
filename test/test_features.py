@@ -3,6 +3,7 @@ Tests brewblox_service.features
 """
 
 import pytest
+
 from brewblox_service import features
 
 
@@ -10,6 +11,10 @@ class DummyFeature(features.ServiceFeature):
     def __init__(self, app, name: str=None, *args, **kwargs):
         super().__init__(app, *args, **kwargs)
         self.name = name
+
+    def __bool__(self):
+        # Falsey features should not raise exceptions in features.get()
+        return False
 
     async def startup(self, app):
         pass
@@ -28,7 +33,7 @@ class OtherDummyFeature(features.ServiceFeature):
 
 def test_add(app):
     features.add(app, DummyFeature(app))
-    assert app[features.FEATURES_KEY][DummyFeature]
+    assert app[features.FEATURES_KEY][DummyFeature] is not None
 
     with pytest.raises(KeyError):
         features.add(app, DummyFeature(app))
