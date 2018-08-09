@@ -8,7 +8,6 @@ pprint = "*"
 aiohttp = "*"
 cchardet = "*"
 aiohttp-swagger = "*"
-aiohttp-cors = "*"
 aioamqp = "*"
 
 [dev-packages]

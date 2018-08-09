@@ -1,13 +1,14 @@
-from setuptools import setup, find_packages
-
+from setuptools import find_packages, setup
 
 setup(
     name='brewblox-service',
     use_scm_version={'local_scheme': lambda v: ''},
+    description='Scaffolding for BrewBlox backend services',
     long_description=open('README.md').read(),
     url='https://github.com/BrewBlox/brewblox-service',
     author='BrewPi',
     author_email='development@brewpi.com',
+    license='GPLv3',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: GNU General Public License (GPL)',
@@ -21,7 +22,6 @@ setup(
         'pprint',
         'aiohttp',
         'cchardet',
-        'aiohttp-cors',
         'aiohttp-swagger',
         'aioamqp',
     ],

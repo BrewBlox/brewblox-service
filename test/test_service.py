@@ -6,7 +6,7 @@ from unittest.mock import call
 
 import pytest
 
-from brewblox_service import service, features
+from brewblox_service import features, service
 
 TESTED = service.__name__
 
@@ -124,6 +124,11 @@ async def test_furnish(app, client):
     res = await client.get('/test_app/_service/status')
     assert res.status == 200
     assert await res.json() == {'status': 'ok'}
+
+    # CORS preflight
+    res = await client.options('/test_app/_service/status')
+    assert res.status == 200
+    assert 'Access-Control-Allow-Origin' in res.headers
 
 
 def test_run(app, mocker, loop):
