@@ -30,11 +30,10 @@ import sys  # noqa
 from logging.handlers import TimedRotatingFileHandler
 from typing import List
 
-import aiohttp_cors
 import aiohttp_swagger
 from aiohttp import web
 
-from brewblox_service import brewblox_logger, features
+from brewblox_service import brewblox_logger, cors_middleware, features
 
 LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
@@ -161,34 +160,15 @@ def furnish(app: web.Application):
     app_name = app['config']['name']
     prefix = '/' + app_name.lstrip('/')
     app.router.add_routes(routes)
-
-    # Configure default CORS settings.
-    cors = aiohttp_cors.setup(app, defaults={
-        "*": aiohttp_cors.ResourceOptions(
-            allow_credentials=True,
-            expose_headers="*",
-            allow_headers="*",
-        )
-    })
+    cors_middleware.enable_cors(app)
 
     # Configure CORS and prefixes on all endpoints.
     known_resources = set()
     for route in list(app.router.routes()):
         if route.resource in known_resources:
             continue
-
-        # Add to known
         known_resources.add(route.resource)
-
-        # Add prefix
         route.resource.add_prefix(prefix)
-
-        # Add CORS
-        # TODO(Bob): Remove static resource instance check when aiohttp-cors bug is fixed
-        # Issue: https://github.com/aio-libs/aiohttp-cors/issues/155
-        if not isinstance(route.resource, web.StaticResource):
-            cors.add(route)
-            LOGGER.debug(f'Enabled CORS for {route.resource}')
 
     # Configure swagger settings
     # We set prefix explicitly here
