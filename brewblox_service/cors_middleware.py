@@ -10,20 +10,10 @@ def enable_cors(app: web.Application):
     app.middlewares.append(cors_middleware)
 
 
-ALLOWED_HEADERS = ','.join((
-    'content-type',
-    'accept',
-    'origin',
-    'authorization',
-    'x-requested-with',
-    'x-csrftoken',
-))
-
-
 def set_cors_headers(request, response):
-    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Methods'] = request.method
-    response.headers['Access-Control-Allow-Headers'] = ALLOWED_HEADERS
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = '*'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
 
