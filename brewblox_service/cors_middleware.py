@@ -3,27 +3,19 @@ Cross Origin Resource Sharing (CORS) headers must be present when using multiple
 This middleware automatically returns OPTIONS requests, and appends other requests with the correct headers.
 """
 
-from aiohttp import web
+from aiohttp import hdrs, web
 
 
 def enable_cors(app: web.Application):
     app.middlewares.append(cors_middleware)
 
 
-ALLOWED_HEADERS = ','.join((
-    'content-type',
-    'accept',
-    'origin',
-    'authorization',
-    'x-requested-with',
-    'x-csrftoken',
-))
-
-
 def set_cors_headers(request, response):
-    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Methods'] = request.method
-    response.headers['Access-Control-Allow-Headers'] = ALLOWED_HEADERS
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] =\
+        request.headers.get('Access-Control-Request-Method', ','.join(hdrs.METH_ALL))
+    response.headers['Access-Control-Allow-Headers'] =\
+        request.headers.get('Access-Control-Request-Headers', '*')
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
 
