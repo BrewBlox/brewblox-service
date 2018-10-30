@@ -8,9 +8,9 @@ services:
 install:
   - source .env
   - pip install pipenv
-  - pipenv install --dev
+  - pipenv sync
 
-script: 
+script:
   - pytest
 
 before_deploy:

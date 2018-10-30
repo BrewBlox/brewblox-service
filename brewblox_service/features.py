@@ -13,8 +13,8 @@ FEATURES_KEY = '#features'
 
 def add(app: web.Application,
         feature: Any,
-        key: Hashable=None,
-        exist_ok: bool=False
+        key: Hashable = None,
+        exist_ok: bool = False
         ):
     """
     Adds a new feature to the app.
@@ -54,8 +54,8 @@ def add(app: web.Application,
 
 
 def get(app: web.Application,
-        feature_type: Type[Any]=None,
-        key: Hashable=None
+        feature_type: Type[Any] = None,
+        key: Hashable = None
         ) -> Any:
     """
     Finds declared feature.
@@ -216,7 +216,7 @@ class ServiceFeature(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    async def shutdown(self, app: web.Application=None):
+    async def shutdown(self, app: web.Application = None):
         """Lifecycle hook for shutting down the feature before the event loop is closed.
 
         Subclasses are expected to override this function.

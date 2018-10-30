@@ -106,9 +106,9 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
 
 
 def create_app(
-        default_name: str=None,
-        parser: argparse.ArgumentParser=None,
-        raw_args: List[str]=None
+        default_name: str = None,
+        parser: argparse.ArgumentParser = None,
+        raw_args: List[str] = None
 ) -> web.Application:
     """
     Creates and configures an Aiohttp application.
