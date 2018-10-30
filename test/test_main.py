@@ -4,7 +4,6 @@ Tests brewblox_service.__main__.py
 
 from brewblox_service import __main__ as main
 
-
 TESTED = main.__name__
 
 
