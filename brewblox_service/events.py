@@ -78,8 +78,8 @@ class EventSubscription():
     def __init__(self,
                  exchange_name: str,
                  routing: str,
-                 exchange_type: ExchangeType_='topic',
-                 on_message: EVENT_CALLBACK_=None):
+                 exchange_type: ExchangeType_ = 'topic',
+                 on_message: EVENT_CALLBACK_ = None):
         self._routing = routing
         self._exchange_name = exchange_name
         self._exchange_type = exchange_type
@@ -141,8 +141,8 @@ class EventListener(features.ServiceFeature):
 
     def __init__(self,
                  app: web.Application,
-                 host: str=None,
-                 port: int=None
+                 host: str = None,
+                 port: int = None
                  ):
         super().__init__(app)
 
@@ -261,8 +261,8 @@ class EventListener(features.ServiceFeature):
     def subscribe(self,
                   exchange_name: str,
                   routing: str,
-                  exchange_type: ExchangeType_='topic',
-                  on_message: EVENT_CALLBACK_=None
+                  exchange_type: ExchangeType_ = 'topic',
+                  on_message: EVENT_CALLBACK_ = None
                   ) -> EventSubscription:
         """Adds a new event subscription to the listener.
 
@@ -326,8 +326,8 @@ class EventPublisher(features.ServiceFeature):
 
     def __init__(self,
                  app: web.Application,
-                 host: str=None,
-                 port: int=None
+                 host: str = None,
+                 port: int = None
                  ):
         super().__init__(app)
 
@@ -383,7 +383,7 @@ class EventPublisher(features.ServiceFeature):
                       exchange: str,
                       routing: str,
                       message: Union[str, dict],
-                      exchange_type: ExchangeType_='topic'):
+                      exchange_type: ExchangeType_ = 'topic'):
         """
         Publish a new event message.
 

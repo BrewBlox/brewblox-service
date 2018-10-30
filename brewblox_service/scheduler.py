@@ -7,6 +7,7 @@ from contextlib import suppress
 from typing import Any, Coroutine, Set
 
 from aiohttp import web
+
 from brewblox_service import features
 
 CLEANUP_INTERVAL_S = 300
@@ -149,7 +150,7 @@ class TaskScheduler(features.ServiceFeature):
         self._tasks.add(task)
         return task
 
-    async def cancel(self, task: asyncio.Task, wait_for: bool=True) -> Any:
+    async def cancel(self, task: asyncio.Task, wait_for: bool = True) -> Any:
         """
         Cancels and waits for an `asyncio.Task` to finish.
         Removes it from the collection of managed tasks.

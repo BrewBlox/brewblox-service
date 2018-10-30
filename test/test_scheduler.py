@@ -6,6 +6,7 @@ Tests brewblox_service.scheduler
 import asyncio
 
 import pytest
+
 from brewblox_service import scheduler
 
 TESTED = scheduler.__name__

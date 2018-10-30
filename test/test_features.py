@@ -8,7 +8,7 @@ from brewblox_service import features
 
 
 class DummyFeature(features.ServiceFeature):
-    def __init__(self, app, name: str=None, *args, **kwargs):
+    def __init__(self, app, name: str = None, *args, **kwargs):
         super().__init__(app, *args, **kwargs)
         self.name = name
 
