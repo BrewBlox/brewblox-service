@@ -5,6 +5,7 @@ Test functions in brewblox_service.service.py
 from unittest.mock import call
 
 import pytest
+from aiohttp import web_exceptions
 
 from brewblox_service import features, service
 
@@ -123,6 +124,7 @@ def test_create_w_parser(sys_args, app_config, mocker):
 async def test_furnish(app, client):
     res = await client.get('/test_app/_service/status')
     assert res.status == 200
+    assert 'Access-Control-Allow-Origin' in res.headers
     assert await res.json() == {'status': 'ok'}
 
     # CORS preflight
@@ -131,9 +133,28 @@ async def test_furnish(app, client):
     assert 'Access-Control-Allow-Origin' in res.headers
 
 
+async def test_error_cors(app, client, mocker):
+    res = await client.get('/test_app/nonsense')
+    assert res.status == 404
+    assert 'Access-Control-Allow-Origin' in res.headers
+
+    mocker.patch(TESTED + '.web.json_response').side_effect = RuntimeError
+    res = await client.get('/test_app/_service/status')
+    assert res.status == 500
+    assert 'Access-Control-Allow-Origin' in res.headers
+
+    mocker.patch(TESTED + '.web.json_response').return_value = web_exceptions.HTTPUnauthorized(reason='')
+    res = await client.get('/test_app/_service/status')
+    assert res.status == 401
+    assert 'Access-Control-Allow-Origin' in res.headers
+
+    mocker.patch(TESTED + '.web.json_response').side_effect = web_exceptions.HTTPUnauthorized(reason='')
+    res = await client.get('/test_app/_service/status')
+    assert res.status == 401
+    assert 'Access-Control-Allow-Origin' in res.headers
+
+
 def test_run(app, mocker, loop):
     run_mock = mocker.patch(TESTED + '.web.run_app')
-
     service.run(app)
-
     run_mock.assert_called_once_with(app, host='0.0.0.0', port=1234)
