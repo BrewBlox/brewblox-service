@@ -2,10 +2,12 @@
 Test functions in brewblox_service.service.py
 """
 
+from asyncio import CancelledError
 from unittest.mock import call
 
 import pytest
 from aiohttp import web_exceptions
+from aiohttp.client_exceptions import ServerDisconnectedError
 
 from brewblox_service import features, service
 
@@ -152,6 +154,10 @@ async def test_error_cors(app, client, mocker):
     res = await client.get('/test_app/_service/status')
     assert res.status == 401
     assert 'Access-Control-Allow-Origin' in res.headers
+
+    mocker.patch(TESTED + '.web.json_response').side_effect = CancelledError
+    with pytest.raises(ServerDisconnectedError):
+        await client.get('/test_app/_service/status')
 
 
 def test_run(app, mocker, loop):
