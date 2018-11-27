@@ -56,6 +56,7 @@ def test_get(app):
     assert features.get(app, DummyFeature).name == 'dummy'
     assert features.get(app, key='jimmy').name == 'jimmy'
     assert features.get(app, DummyFeature, key='jimmy').name == 'jimmy'
+    assert hasattr(features.get(app, DummyFeature), 'before_shutdown')
 
     with pytest.raises(KeyError):
         features.get(app, key='holy grail')

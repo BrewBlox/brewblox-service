@@ -105,7 +105,8 @@ class ServiceFeature(ABC):
     the (synchronous) `__init__()` and `__del__()` functions may not be sufficient.
     Aiohttp offers comparable init/deinit hooks, but inside the context of a running event loop.
 
-    ServiceFeature registers the `self.startup(self, app)` and `self.shutdown(self, app)` as lifecycle callbacks.
+    ServiceFeature registers the `self.startup(self, app)`, `self.before_shutdown(app)`,
+     and `self.shutdown(self, app)` as lifecycle callbacks.
     They will be called by Aiohttp at the appropriate moment.
     By overriding these functions, subclasses can perform initialization/deinitialization that requires an event loop.
 
@@ -129,6 +130,9 @@ class ServiceFeature(ABC):
             async def startup(self, app: web.Application):
                 # Schedule a long-running background task
                 self._task = await scheduler.create_task(app, self._hello())
+
+            async def before_shutdown(self, app: web.Application):
+                print('Any minute now...')
 
             async def shutdown(self, app: web.Application):
                 # Orderly cancel the background task
@@ -157,6 +161,7 @@ class ServiceFeature(ABC):
         # greeter.startup(app) is called now
 
         # Press Ctrl+C to quit
+        # greeter.before_shutdown(app) will be called
         # greeter.shutdown(app) will be called
     """
 
@@ -189,6 +194,7 @@ class ServiceFeature(ABC):
             startup == Startup.AUTODETECT and not app.loop
         ]):
             app.on_startup.append(self.startup)
+            app.on_shutdown.append(self.before_shutdown)
             app.on_cleanup.append(self.shutdown)
 
     @property
@@ -215,6 +221,20 @@ class ServiceFeature(ABC):
         """
         pass  # pragma: no cover
 
+    async def before_shutdown(self, app: web.Application):
+        """Lifecycle hook for preparing to shut down the feature.
+
+        Subclasses may override this function, but it is not mandatory.
+
+        Depending on the `startup` argument in `__init__()`,
+        `before_shutdown()` will be called when Aiohttp is closing.
+
+        Args:
+            app (web.Application):
+                Current Aiohttp application.
+        """
+        pass  # pragma: no cover
+
     @abstractmethod
     async def shutdown(self, app: web.Application = None):
         """Lifecycle hook for shutting down the feature before the event loop is closed.
@@ -222,7 +242,7 @@ class ServiceFeature(ABC):
         Subclasses are expected to override this function.
 
         Depending on the `startup` argument in `__init__()`,
-        `shutdown()` will be called when Aiohttp starts running.
+        `shutdown()` will be called when Aiohttp is closing.
 
         Args:
             app (web.Application):
