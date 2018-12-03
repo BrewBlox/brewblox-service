@@ -1,4 +1,4 @@
-FROM resin/raspberrypi3-python:3.6
+FROM brewblox/rpi-python:3.7
 EXPOSE 5000
 WORKDIR /app
 

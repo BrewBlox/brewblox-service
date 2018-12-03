@@ -57,8 +57,7 @@ async def app(app, mocker, loop, mocked_connect):
     """App with events enabled"""
     scheduler.setup(app)
     events.setup(app)
-    mocker.patch(TESTED + '.PENDING_WAIT_TIMEOUT', timedelta(microseconds=10))
-    mocker.patch(TESTED + '.RECONNECT_INTERVAL', timedelta(microseconds=10))
+    mocker.patch(TESTED + '.RECONNECT_INTERVAL', timedelta(microseconds=100))
     return app
 
 

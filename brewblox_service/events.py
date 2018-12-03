@@ -23,7 +23,7 @@ Example use:
 
 import asyncio
 import json
-from concurrent.futures import CancelledError, TimeoutError
+import warnings
 from datetime import timedelta
 from typing import Callable, Coroutine, List, Union
 
@@ -207,7 +207,11 @@ class EventListener(features.ServiceFeature):
                             timeout=PENDING_WAIT_TIMEOUT.seconds
                         )
 
-                    except TimeoutError:
+                    except asyncio.CancelledError:
+                        # Exiting task
+                        raise
+
+                    except asyncio.TimeoutError:  # pragma: no cover
                         # Timeout ensures that connection state is checked at least once per timeout
                         continue
 
@@ -222,13 +226,13 @@ class EventListener(features.ServiceFeature):
                         self._pending.put_nowait(subscription)
                         raise
 
-            except CancelledError:
+            except asyncio.CancelledError:
                 LOGGER.info(f'Cancelled {self}')
                 break
 
             except Exception as ex:
                 if not retrying:
-                    LOGGER.warn(f'Connection error in {self}: {type(ex)}:{ex}')
+                    warnings.warn(f'Connection error in {self}: {type(ex)}:{ex}')
                     retrying = True
 
                 await asyncio.sleep(RECONNECT_INTERVAL.seconds)
@@ -481,7 +485,7 @@ async def post_publish(request):
         return web.Response()
 
     except Exception as ex:
-        LOGGER.warn(f'Unable to publish {args}: {ex}')
+        warnings.warn(f'Unable to publish {args}: {ex}')
         return web.Response(body='Event bus connection refused', status=500)
 
 
