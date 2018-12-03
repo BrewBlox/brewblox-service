@@ -25,7 +25,6 @@ setup(
         'aiohttp-swagger',
         'aioamqp',
     ],
-    python_requires='>=3.6',
-    extras_require={'dev': ['tox']},
+    python_requires='>=3.7',
     setup_requires=['setuptools_scm']
 )
