@@ -9,6 +9,7 @@ aiohttp = "*"
 cchardet = "*"
 aiohttp-swagger = "*"
 aioamqp = "*"
+pyyaml = "*"
 
 [dev-packages]
 pytest-sugar = "*"
@@ -24,3 +25,6 @@ brewblox-tools = "*"
 
 [requires]
 python_version = "3.7"
+
+[pipenv]
+allow_prereleases = true

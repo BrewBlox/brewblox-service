@@ -141,7 +141,7 @@ def create_app(
     _init_logging(args)
 
     LOGGER.info(f'Creating [{args.name}] application')
-    app = web.Application(debug=args.debug)
+    app = web.Application()
     app['config'] = vars(args)
     return app
 

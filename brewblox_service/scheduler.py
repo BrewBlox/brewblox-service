@@ -146,7 +146,7 @@ class TaskScheduler(features.ServiceFeature):
                 During Aiohttp shutdown, the scheduler will attempt to cancel and await this task.
                 The task can be safely cancelled manually, or using `TaskScheduler.cancel(task)`.
         """
-        task = self.app.loop.create_task(coro)
+        task = asyncio.get_event_loop().create_task(coro)
         self._tasks.add(task)
         return task
 

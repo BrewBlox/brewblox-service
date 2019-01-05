@@ -166,16 +166,16 @@ class EventListener(features.ServiceFeature):
         This function is a no-op if any of the preconditions is not met.
 
         Preconditions are:
-        * The application is running (self.app.loop)
+        * The application is running (self.app.frozen)
         * The task is not already running
         * There are subscriptions: either pending, or active
         """
         if all([
-            self.app.loop,
+            self.app.frozen,
             not self._task or self._task.done(),
             self._subscriptions or (self._pending and not self._pending.empty()),
         ]):
-            self._task = self.app.loop.create_task(self._listen())
+            self._task = asyncio.get_event_loop().create_task(self._listen())
 
     async def _listen(self):
         retrying = False
@@ -185,7 +185,6 @@ class EventListener(features.ServiceFeature):
                 transport, protocol = await aioamqp.connect(
                     host=self._host,
                     port=self._port,
-                    loop=self.app.loop
                 )
 
                 channel = await protocol.channel()
@@ -247,7 +246,7 @@ class EventListener(features.ServiceFeature):
 
     async def startup(self, app: web.Application):
         # Initialize the async queue now we know which loop we're using
-        self._pending = asyncio.Queue(loop=app.loop)
+        self._pending = asyncio.Queue()
 
         # Transfer all subscriptions that were made before the event loop started
         [self._pending.put_nowait(s) for s in self._pending_pre_async]
