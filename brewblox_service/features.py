@@ -191,7 +191,7 @@ class ServiceFeature(ABC):
 
         if any([
             startup == Startup.MANAGED,
-            startup == Startup.AUTODETECT and not app.loop
+            startup == Startup.AUTODETECT and not app.frozen
         ]):
             app.on_startup.append(self.startup)
             app.on_shutdown.append(self.before_shutdown)
