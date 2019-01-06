@@ -155,10 +155,15 @@ class EventListener(features.ServiceFeature):
         self._pending: asyncio.Queue = None
         self._subscriptions: List[EventSubscription] = []
 
+        self._loop: asyncio.BaseEventLoop = None
         self._task: asyncio.Task = None
 
     def __str__(self):
         return f'<{type(self).__name__} for "{self._host}">'
+
+    @property
+    def running(self):
+        return bool(self._task and not self._task.done())
 
     def _lazy_listen(self):
         """
@@ -166,18 +171,19 @@ class EventListener(features.ServiceFeature):
         This function is a no-op if any of the preconditions is not met.
 
         Preconditions are:
-        * The application is running (self.app.frozen)
+        * The application is running (self._loop is set)
         * The task is not already running
         * There are subscriptions: either pending, or active
         """
         if all([
-            self.app.frozen,
-            not self._task or self._task.done(),
+            self._loop,
+            not self.running,
             self._subscriptions or (self._pending and not self._pending.empty()),
         ]):
-            self._task = asyncio.get_event_loop().create_task(self._listen())
+            self._task = self._loop.create_task(self._listen())
 
     async def _listen(self):
+        LOGGER.info(f'{self} now listening')
         retrying = False
 
         while True:
@@ -245,7 +251,10 @@ class EventListener(features.ServiceFeature):
                     pass
 
     async def startup(self, app: web.Application):
+        await self.shutdown(app)
+
         # Initialize the async queue now we know which loop we're using
+        self._loop = asyncio.get_event_loop()
         self._pending = asyncio.Queue()
 
         # Transfer all subscriptions that were made before the event loop started
@@ -259,6 +268,7 @@ class EventListener(features.ServiceFeature):
     async def shutdown(self, app: web.Application):
         LOGGER.info(f'Closing {self}')
         await scheduler.cancel_task(app, self._task)
+        self._loop = None
         self._task = None
 
     def subscribe(self,
