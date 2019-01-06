@@ -61,6 +61,11 @@ async def app(app, mocker, loop, mocked_connect):
     return app
 
 
+@pytest.fixture
+async def pre_sub(app):
+    return events.get_listener(app).subscribe('pre_exchange', 'pre_routing')
+
+
 async def test_setup(app, client):
     assert events.get_listener(app)
     assert events.get_publisher(app)
@@ -109,6 +114,16 @@ async def test_offline_listener(app, mocker):
 
     # Can safely be called, but will be a no-op at this time
     await listener.shutdown(app)
+
+
+async def test_deferred_subscription(app, pre_sub, client):
+    # Tests whether subscriptions made before startup are correctly initialized
+    await asyncio.sleep(0.1)
+    listener = events.get_listener(app)
+    assert listener.running
+    assert listener._pending_pre_async is None
+    assert listener._pending.qsize() == 0
+    assert len(listener._subscriptions) == 1
 
 
 async def test_online_listener(app, client, mocker):
