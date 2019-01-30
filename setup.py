@@ -10,9 +10,9 @@ setup(
     author_email='development@brewpi.com',
     license='GPLv3',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'License :: OSI Approved :: GNU General Public License (GPL)',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Intended Audience :: End Users/Desktop',
         'Topic :: System :: Hardware',
     ],
