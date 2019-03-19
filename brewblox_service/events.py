@@ -126,6 +126,7 @@ class EventSubscription():
                      properties: aioamqp.properties.Properties):
         """Relays incoming messages between the queue and the user callback"""
         try:
+            await channel.basic_client_ack(envelope.delivery_tag)
             await self.on_message(self, envelope.routing_key, json.loads(body))
         except Exception as ex:
             LOGGER.error(f'Exception relaying message in {self}: {ex}')
