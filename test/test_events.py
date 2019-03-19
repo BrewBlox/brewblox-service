@@ -24,6 +24,7 @@ def channel_mock():
     m.queue_bind = CoroutineMock()
     m.basic_consume = CoroutineMock()
     m.basic_publish = CoroutineMock()
+    m.basic_client_ack = CoroutineMock()
     return m
 
 
@@ -71,11 +72,10 @@ async def test_setup(app, client):
     assert events.get_publisher(app)
 
 
-async def test_subscribe_callbacks(app, client, mocker):
+async def test_subscribe_callbacks(app, client, mocker, channel_mock):
     cb = Mock()
     content = dict(key='var')
 
-    chan_mock = Mock()
     body = json.dumps(content)
     envelope_mock = Mock()
     envelope_mock.routing_key = 'message_key'
@@ -84,23 +84,27 @@ async def test_subscribe_callbacks(app, client, mocker):
     sub = events.get_listener(app).subscribe(
         'brewblox', 'router', on_message=cb)
 
-    await sub._relay(chan_mock, body, envelope_mock, properties_mock)
+    await sub._relay(channel_mock, body, envelope_mock, properties_mock)
+    assert channel_mock.basic_client_ack.call_count == 1
     cb.assert_called_once_with(sub, 'message_key', content)
 
     cb2 = Mock()
     sub.on_message = cb2
 
-    await sub._relay(chan_mock, body, envelope_mock, properties_mock)
+    await sub._relay(channel_mock, body, envelope_mock, properties_mock)
     cb2.assert_called_once_with(sub, 'message_key', content)
+    assert channel_mock.basic_client_ack.call_count == 2
     assert cb.call_count == 1
 
     # Shouldn't blow up
     cb2.side_effect = ValueError
-    await sub._relay(chan_mock, body, envelope_mock, properties_mock)
+    await sub._relay(channel_mock, body, envelope_mock, properties_mock)
+    assert channel_mock.basic_client_ack.call_count == 3
 
     # Should be tolerated
     sub.on_message = None
-    await sub._relay(chan_mock, body, envelope_mock, properties_mock)
+    await sub._relay(channel_mock, body, envelope_mock, properties_mock)
+    assert channel_mock.basic_client_ack.call_count == 4
 
 
 async def test_offline_listener(app, mocker):
