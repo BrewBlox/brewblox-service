@@ -2,6 +2,9 @@ FROM brewblox/rpi-python:3.7
 EXPOSE 5000
 WORKDIR /app
 
+ARG service_info=UNKNOWN
+ENV SERVICE_INFO=${service_info}
+
 COPY ./dist /build/dist
 COPY ./requirements.txt /build/requirements.txt
 
