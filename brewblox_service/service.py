@@ -28,6 +28,7 @@ import logging
 # The argumentparser can't fall back to the default sys.argv if sys is not imported
 import sys  # noqa
 from logging.handlers import TimedRotatingFileHandler
+from os import getenv
 from typing import List
 
 import aiohttp_swagger
@@ -178,6 +179,8 @@ def furnish(app: web.Application):
                                   title=f'Brewblox Service "{app_name}"',
                                   api_version='0.0',
                                   contact='development@brewpi.com')
+
+    LOGGER.info('Service info: ' + getenv('SERVICE_INFO', 'UNKNOWN'))
 
     for route in app.router.routes():
         LOGGER.info(f'Endpoint [{route.method}] {route.resource}')

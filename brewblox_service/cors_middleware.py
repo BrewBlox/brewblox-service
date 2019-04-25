@@ -7,7 +7,7 @@ from asyncio import CancelledError
 
 from aiohttp import hdrs, web, web_exceptions
 
-from brewblox_service import brewblox_logger
+from brewblox_service import brewblox_logger, strex
 
 LOGGER = brewblox_logger(__name__)
 
@@ -39,6 +39,6 @@ async def cors_middleware(request: web.Request, handler: web.RequestHandler) -> 
         except web_exceptions.HTTPError as ex:
             response = ex
         except Exception as ex:
-            response = web_exceptions.HTTPInternalServerError(reason=f'{type(ex).__name__}({ex})')
+            response = web_exceptions.HTTPInternalServerError(reason=strex(ex))
 
         return set_cors_headers(request, response)

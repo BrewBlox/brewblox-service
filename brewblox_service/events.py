@@ -30,7 +30,7 @@ from typing import Callable, Coroutine, List, Union
 import aioamqp
 from aiohttp import web
 
-from brewblox_service import brewblox_logger, features, scheduler
+from brewblox_service import brewblox_logger, features, scheduler, strex
 
 LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
@@ -238,7 +238,7 @@ class EventListener(features.ServiceFeature):
 
             except Exception as ex:
                 if not retrying:
-                    warnings.warn(f'Connection error in {self}: {type(ex)}:{ex}')
+                    warnings.warn(f'Connection error in {self}: {strex(ex)}')
                     retrying = True
 
                 await asyncio.sleep(RECONNECT_INTERVAL.seconds)
