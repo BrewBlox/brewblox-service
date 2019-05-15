@@ -5,6 +5,7 @@ setup(
     use_scm_version={'local_scheme': lambda v: ''},
     description='Scaffolding for BrewBlox backend services',
     long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     url='https://github.com/BrewBlox/brewblox-service',
     author='BrewPi',
     author_email='development@brewpi.com',
