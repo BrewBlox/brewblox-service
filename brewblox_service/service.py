@@ -183,10 +183,10 @@ def furnish(app: web.Application):
     LOGGER.info('Service info: ' + getenv('SERVICE_INFO', 'UNKNOWN'))
 
     for route in app.router.routes():
-        LOGGER.info(f'Endpoint [{route.method}] {route.resource}')
+        LOGGER.debug(f'Endpoint [{route.method}] {route.resource}')
 
     for name, impl in app.get(features.FEATURES_KEY, {}).items():
-        LOGGER.info(f'Feature [{name}] {impl}')
+        LOGGER.debug(f'Feature [{name}] {impl}')
 
 
 def run(app: web.Application):
