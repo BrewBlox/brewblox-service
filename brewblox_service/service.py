@@ -27,6 +27,7 @@ import argparse
 import logging
 # The argumentparser can't fall back to the default sys.argv if sys is not imported
 import sys  # noqa
+import warnings
 from logging.handlers import TimedRotatingFileHandler
 from os import getenv
 from typing import List
@@ -173,12 +174,14 @@ def furnish(app: web.Application):
 
     # Configure swagger settings
     # We set prefix explicitly here
-    aiohttp_swagger.setup_swagger(app,
-                                  swagger_url=prefix + '/api/doc',
-                                  description='',
-                                  title=f'Brewblox Service "{app_name}"',
-                                  api_version='0.0',
-                                  contact='development@brewpi.com')
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        aiohttp_swagger.setup_swagger(app,
+                                      swagger_url=prefix + '/api/doc',
+                                      description='',
+                                      title=f'Brewblox Service "{app_name}"',
+                                      api_version='0.0',
+                                      contact='development@brewpi.com')
 
     LOGGER.info('Service info: ' + getenv('SERVICE_INFO', 'UNKNOWN'))
 
