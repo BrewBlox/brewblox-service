@@ -1,12 +1,9 @@
 [[source]]
-
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 name = "pypi"
 
-
 [packages]
-
 pprint = "*"
 aiohttp = "*"
 cchardet = "*"
@@ -14,9 +11,7 @@ aiohttp-swagger = "*"
 aioamqp = "*"
 pyyaml = "*"
 
-
 [dev-packages]
-
 "flake8" = "*"
 pytest-sugar = "*"
 "pytest-flake8" = "*"
@@ -24,11 +19,10 @@ pytest-cov = "*"
 pytest-mock = "*"
 pytest-aiohttp = "*"
 asynctest = "*"
-aioresponses = "*"
 "autopep8" = "*"
 brewblox-tools = "*"
-
+aresponses = "*"
+pytest = "*"
 
 [requires]
-
 python_version = "3.7"
