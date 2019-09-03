@@ -16,6 +16,7 @@ def log_enabled():
     """Sets log level to DEBUG for all test functions.
     Allows all logged messages to be captured during pytest runs"""
     logging.getLogger().setLevel(logging.DEBUG)
+    logging.captureWarnings(True)
 
 
 @pytest.fixture
@@ -41,6 +42,13 @@ def sys_args(app_config) -> list:
         '--eventbus-host', app_config['eventbus_host'],
         '--eventbus-port', app_config['eventbus_port'],
     ]]
+
+
+@pytest.fixture
+def event_loop(loop):
+    # aresponses uses the "event_loop" fixture
+    # this makes loop available under either name
+    yield loop
 
 
 @pytest.fixture
