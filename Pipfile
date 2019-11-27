@@ -20,9 +20,9 @@ pytest-mock = "*"
 pytest-aiohttp = "*"
 asynctest = "*"
 "autopep8" = "*"
-brewblox-tools = "*"
 aresponses = "*"
 pytest = "*"
+brewblox-dev = "*"
 
 [requires]
 python_version = "3.7"
