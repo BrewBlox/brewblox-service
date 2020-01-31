@@ -18,11 +18,10 @@ pytest-sugar = "*"
 pytest-cov = "*"
 pytest-mock = "*"
 pytest-aiohttp = "*"
-asynctest = "*"
 "autopep8" = "*"
 aresponses = "*"
 pytest = "*"
 brewblox-dev = "*"
 
 [requires]
-python_version = "3.7"
+python_version = "3.8"

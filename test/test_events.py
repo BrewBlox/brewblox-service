@@ -5,11 +5,11 @@ Tests functionality offered by brewblox_service.events
 import asyncio
 import json
 from datetime import timedelta
-from unittest.mock import Mock, call
+from unittest.mock import AsyncMock, Mock, call
 
 import aioamqp
 import pytest
-from asynctest import CoroutineMock
+from aiohttp.client_exceptions import ContentTypeError
 
 from brewblox_service import events, scheduler
 
@@ -19,21 +19,21 @@ TESTED = events.__name__
 @pytest.fixture
 def channel_mock():
     m = Mock()
-    m.exchange_declare = CoroutineMock()
-    m.queue_declare = CoroutineMock(return_value={'queue': 'queue_name'})
-    m.queue_bind = CoroutineMock()
-    m.basic_consume = CoroutineMock()
-    m.basic_publish = CoroutineMock()
-    m.basic_client_ack = CoroutineMock()
+    m.exchange_declare = AsyncMock()
+    m.queue_declare = AsyncMock(return_value={'queue': 'queue_name'})
+    m.queue_bind = AsyncMock()
+    m.basic_consume = AsyncMock()
+    m.basic_publish = AsyncMock()
+    m.basic_client_ack = AsyncMock()
     return m
 
 
 @pytest.fixture
 def protocol_mock(channel_mock):
     m = Mock()
-    m.channel = CoroutineMock(return_value=channel_mock)
-    m.ensure_open = CoroutineMock()
-    m.close = CoroutineMock()
+    m.channel = AsyncMock(return_value=channel_mock)
+    m.ensure_open = AsyncMock()
+    m.close = AsyncMock()
     return m
 
 
@@ -45,7 +45,7 @@ def transport_mock():
 @pytest.fixture
 def mocked_connect(mocker, protocol_mock, transport_mock):
     # connect()
-    conn_mock_func = CoroutineMock(spec=aioamqp.connect)
+    conn_mock_func = AsyncMock(spec=aioamqp.connect)
     conn_mock_func.return_value = (transport_mock, protocol_mock)
 
     mocker.patch.object(events.aioamqp, 'connect', conn_mock_func)
@@ -65,6 +65,17 @@ async def app(app, mocker, loop, mocked_connect):
 @pytest.fixture
 async def pre_sub(app):
     return events.get_listener(app).subscribe('pre_exchange', 'pre_routing')
+
+
+async def response(request, status=200):
+    retv = await request
+    if retv.status != status:
+        print(retv)
+        assert retv == status
+    try:
+        return await retv.json()
+    except ContentTypeError:
+        return await retv.text()
 
 
 async def test_setup(app, client):
@@ -165,43 +176,45 @@ async def test_online_publisher(app, client, mocker):
     await publisher.publish('exchange', 'key', message=dict(key='val'))
 
 
-async def test_publish_endpoint(app, client, mocker):
-    publish_spy = mocker.spy(events.get_publisher(app), 'publish')
-
+async def test_publish_endpoint(app, client, mocker, channel_mock):
     # standard ok
-    assert (await client.post('/_debug/publish', json=dict(
+    await response(client.post('/_debug/publish', json=dict(
         exchange='exchange',
         routing='first',
         message=dict(key='val')
-    ))).status == 200
+    )))
 
     # string messages supported
-    assert (await client.post('/_debug/publish', json=dict(
+    await response(client.post('/_debug/publish', json=dict(
         exchange='exchange',
         routing='second',
         message='message'
-    ))).status == 200
+    )))
 
-    # return 500 on connection refused
-    events.get_publisher(app)._ensure_channel = CoroutineMock(side_effect=ConnectionRefusedError)
-    assert (await client.post('/_debug/publish', json=dict(
+    mocker.patch.object(events.get_publisher(app),
+                        '_ensure_channel',
+                        AsyncMock(side_effect=RuntimeError))
+
+    await response(client.post('/_debug/publish', json=dict(
         exchange='exchange',
-        routing='third',
-        message='message'
-    ))).status == 500
+        routing='first',
+        message=dict(key='val')
+    )), 500)
 
-    publish_spy.assert_has_calls([
-        call('exchange', 'first', dict(key='val')),
-        call('exchange', 'second', 'message'),
-        call('exchange', 'third', 'message'),
+    msg1 = json.dumps({'key': 'val'}).encode()
+    msg2 = json.dumps('message').encode()
+
+    channel_mock.basic_publish.assert_has_calls([
+        call(payload=msg1, exchange_name='exchange', routing_key='first'),
+        call(payload=msg2, exchange_name='exchange', routing_key='second'),
     ])
 
 
 async def test_subscribe_endpoint(app, client, channel_mock):
-    assert (await client.post('/_debug/subscribe', json=dict(
+    await response(client.post('/_debug/subscribe', json=dict(
         exchange='exchange',
         routing='routing.key'
-    ))).status == 200
+    )))
 
     await asyncio.sleep(0.01)
 
@@ -240,7 +253,7 @@ async def test_listener_exceptions(app, client, protocol_mock, channel_mock, tra
     assert transport_mock.close.call_count == mocked_connect.call_count
 
 
-async def test_listener_periodic_check(mocker, app, client, loop, protocol_mock):
+async def test_listener_periodic_check(mocker, app, client, protocol_mock):
     # No subscriptions were made - not listening
     await asyncio.sleep(0.1)
     assert protocol_mock.ensure_open.call_count == 0

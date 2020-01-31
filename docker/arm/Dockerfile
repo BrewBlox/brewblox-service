@@ -1,4 +1,4 @@
-FROM brewblox/rpi-python:3.7
+FROM brewblox/rpi-python:3.8
 EXPOSE 5000
 WORKDIR /app
 

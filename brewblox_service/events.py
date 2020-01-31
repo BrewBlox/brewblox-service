@@ -254,8 +254,8 @@ class EventListener(features.ServiceFeature):
     async def startup(self, app: web.Application):
         await self.shutdown(app)
 
-        # Initialize the async queue now we know which loop we're using
-        self._loop = asyncio.get_event_loop()
+        # Initialize the async queue now we're in an async context
+        self._loop = asyncio.get_running_loop()
         self._pending = asyncio.Queue()
 
         # Transfer all subscriptions that were made before the event loop started
@@ -376,8 +376,7 @@ class EventPublisher(features.ServiceFeature):
         if not self.connected:
             self._transport, self._protocol = await aioamqp.connect(
                 host=self._host,
-                port=self._port,
-                loop=self.app.loop
+                port=self._port
             )
             self._channel = await self._protocol.channel()
 
@@ -433,9 +432,11 @@ class EventPublisher(features.ServiceFeature):
         """
         try:
             await self._ensure_channel()
-        except Exception:
+            print('ok')
+        except Exception as e:
             # If server has restarted since our last attempt, ensure channel will fail (old connection invalid)
             # Retry once to check whether a new connection can be made
+            print(e)
             await self._ensure_channel()
 
         # json.dumps() also correctly handles strings
@@ -486,17 +487,12 @@ async def post_publish(request):
                     type: object
     """
     args = await request.json()
-    try:
-        await get_publisher(request.app).publish(
-            args['exchange'],
-            args['routing'],
-            args['message']
-        )
-        return web.Response()
-
-    except Exception as ex:
-        warnings.warn(f'Unable to publish {args}: {ex}')
-        return web.Response(body='Event bus connection refused', status=500)
+    await get_publisher(request.app).publish(
+        args['exchange'],
+        args['routing'],
+        args['message']
+    )
+    return web.Response()
 
 
 @routes.post('/_debug/subscribe')

@@ -7,7 +7,7 @@ from brewblox_service import __main__ as main
 TESTED = main.__name__
 
 
-def test_main(loop, mocker):
+def test_main(mocker):
     create_mock = mocker.patch(TESTED + '.service.create_app')
     furnish_mock = mocker.patch(TESTED + '.service.furnish')
     run_mock = mocker.patch(TESTED + '.service.run')
