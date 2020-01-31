@@ -176,5 +176,5 @@ class TaskScheduler(features.ServiceFeature):
         with suppress(KeyError):
             self._tasks.remove(task)
 
-        with suppress(Exception):
+        with suppress(Exception, asyncio.CancelledError):
             return (await task) if wait_for else None
