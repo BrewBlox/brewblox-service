@@ -432,11 +432,9 @@ class EventPublisher(features.ServiceFeature):
         """
         try:
             await self._ensure_channel()
-            print('ok')
-        except Exception as e:
+        except Exception:
             # If server has restarted since our last attempt, ensure channel will fail (old connection invalid)
             # Retry once to check whether a new connection can be made
-            print(e)
             await self._ensure_channel()
 
         # json.dumps() also correctly handles strings
