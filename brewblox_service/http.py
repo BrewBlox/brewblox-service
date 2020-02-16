@@ -1,6 +1,7 @@
 """
 Brewblox feature for the aiohttp client
 """
+
 from typing import Optional
 
 from aiohttp import ClientSession, web

@@ -1,16 +1,16 @@
 """
-Tests brewblox_service.couchdb_client
+Tests brewblox_service.couchdb
 """
 
 import pytest
 from aiohttp import web
 from aiohttp.client_exceptions import ClientResponseError
 
-from brewblox_service import couchdb_client, http_client
-from brewblox_service.couchdb_client import check_remote, read, write
+from brewblox_service import couchdb, http
+from brewblox_service.couchdb import check_remote, read, write
 
-TESTED = couchdb_client.__name__
-SRV_URL = couchdb_client.COUCH_URL[len('http://'):]
+TESTED = couchdb.__name__
+SRV_URL = couchdb.COUCH_URL[len('http://'):]
 DB_URL = '/sparkbase'
 DOC_URL = '/sparkbase/sparkdoc'
 
@@ -18,8 +18,8 @@ DOC_URL = '/sparkbase/sparkdoc'
 @pytest.fixture
 def app(app, mocker):
     mocker.patch(TESTED + '.DB_RETRY_INTERVAL_S', 0.01)
-    http_client.setup(app)
-    couchdb_client.setup(app)
+    http.setup(app)
+    couchdb.setup(app)
     return app
 
 
