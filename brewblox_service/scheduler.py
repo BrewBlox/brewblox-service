@@ -4,31 +4,119 @@ Background task scheduling.
 
 import asyncio
 from contextlib import suppress
-from typing import Any, Coroutine, Set
+from typing import Any, Coroutine, Optional, Set
 
 from aiohttp import web
 
-from brewblox_service import features
+from brewblox_service import brewblox_logger, features
 
 CLEANUP_INTERVAL_S = 300
 
 
+LOGGER = brewblox_logger(__name__)
+
+
+class TaskScheduler(features.ServiceFeature):
+
+    def __init__(self, app: web.Application):
+        super().__init__(app)
+        self._tasks: Set[asyncio.Task] = set()
+
+    async def startup(self, *_):
+        await self.create(self._cleanup())
+
+    async def shutdown(self, *_):
+        for task in self._tasks:
+            task.cancel()
+        await asyncio.wait(self._tasks)
+        self._tasks.clear()
+
+    async def _cleanup(self):
+        """
+        Periodically removes completed tasks from the collection,
+        allowing fire-and-forget tasks to be garbage collected.
+
+        This does not delete the task object, it merely removes the reference in the scheduler.
+        """
+        while True:
+            await asyncio.sleep(CLEANUP_INTERVAL_S)
+            self._tasks = set(t for t in self._tasks if not t.done())
+
+    async def create(self,
+                     coro: Coroutine,
+                     name: str = None,
+                     ) -> asyncio.Task:
+        task = asyncio.create_task(coro, name=name)
+        LOGGER.debug(f'Scheduled {task}')
+        self._tasks.add(task)
+        return task
+
+    async def cancel(self,
+                     task: asyncio.Task,
+                     wait_for: bool = True,
+                     ) -> Optional[Any]:
+        if task is None:
+            return
+
+        task.cancel()
+
+        with suppress(KeyError):
+            self._tasks.remove(task)
+
+        retv = None
+
+        with suppress(Exception, asyncio.CancelledError):
+            if wait_for:
+                retv = await task
+
+        LOGGER.debug(f'Cancelled: {task}')
+        return retv
+
+
 def setup(app: web.Application):
+    """Registers scheduler functionality with Application.
+
+    Args:
+        app (web.Application):
+            The Aiohttp Application object.
+    """
     features.add(app, TaskScheduler(app))
 
 
-def get_scheduler(app: web.Application) -> 'TaskScheduler':
+def get_scheduler(app: web.Application) -> TaskScheduler:
+    """Gets the default TaskScheduler object
+
+    Args:
+        app (web.Application):
+            The Aiohttp Application object.
+    """
     return features.get(app, TaskScheduler)
 
 
-async def create_task(app: web.Application,
-                      coro: Coroutine,
-                      *args, **kwargs
-                      ) -> asyncio.Task:
+async def create(app: web.Application,
+                 coro: Coroutine,
+                 name: str = None
+                 ) -> asyncio.Task:
     """
-    Convenience function for calling `TaskScheduler.create(coro)`
+    Starts execution of a coroutine.
 
-    This will use the default `TaskScheduler` to create a new background task.
+    The created asyncio.Task is returned, and added to managed tasks.
+    The scheduler guarantees that it is cancelled during application shutdown,
+    regardless of whether it was already cancelled manually.
+
+    Shortcut for `TaskScheduler.create(coro)`
+    Requires setup() to have been called.
+
+    Args:
+        coro (Coroutine):
+            The coroutine to be wrapped in a task, and executed.
+        name (str):
+            Custom name for the created task.
+
+    Returns:
+        asyncio.Task: An awaitable Task object.
+            During Aiohttp shutdown, the scheduler will attempt to cancel and await this task.
+            The task can be safely cancelled manually, or using `TaskScheduler.cancel(task)`.
 
     Example:
 
@@ -44,7 +132,7 @@ async def create_task(app: web.Application,
 
 
         async def start(app):
-            await scheduler.create_task(app, current_time(interval=2))
+            await scheduler.create(app, current_time(interval=2))
 
 
         app = service.create_app(default_name='example')
@@ -55,17 +143,31 @@ async def create_task(app: web.Application,
         service.furnish(app)
         service.run(app)
     """
-    return await get_scheduler(app).create(coro, *args, **kwargs)
+    return await get_scheduler(app).create(coro, name=name)
 
 
-async def cancel_task(app: web.Application,
-                      task: asyncio.Task,
-                      *args, **kwargs
-                      ) -> Any:
+async def cancel(app: web.Application,
+                 task: asyncio.Task,
+                 wait_for: bool = True,
+                 ) -> Optional[Any]:
     """
-    Convenience function for calling `TaskScheduler.cancel(task)`
+    Cancels and waits for an `asyncio.Task` to finish.
+    Removes it from the collection of managed tasks.
 
-    This will use the default `TaskScheduler` to cancel the given task.
+    Shortcut for `TaskScheduler.cancel(task)`.
+    Requires setup() to have been called.
+
+    Args:
+        task (asyncio.Task):
+            The to be cancelled task.
+            It is not required that the task was was created with `TaskScheduler.create()`.
+
+        wait_for (bool, optional):
+            Whether to wait for the task to finish execution.
+            If falsey, this function returns immediately after cancelling the task.
+
+    Returns:
+        Any: The return value of `task`. None if `wait_for` is falsey.
 
     Example:
 
@@ -81,16 +183,16 @@ async def cancel_task(app: web.Application,
 
         async def stop_after(app, task, duration):
             await asyncio.sleep(duration)
-            await scheduler.cancel_task(app, task)
+            await scheduler.cancel(app, task)
             print('stopped!')
 
 
         async def start(app):
             # Start first task
-            task = await scheduler.create_task(app, current_time(interval=2))
+            task = await scheduler.create(app, current_time(interval=2))
 
             # Start second task to stop the first
-            await scheduler.create_task(app, stop_after(app, task, duration=10))
+            await scheduler.create(app, stop_after(app, task, duration=10))
 
 
         app = service.create_app(default_name='example')
@@ -101,80 +203,4 @@ async def cancel_task(app: web.Application,
         service.furnish(app)
         service.run(app)
     """
-    return await get_scheduler(app).cancel(task, *args, **kwargs)
-
-
-class TaskScheduler(features.ServiceFeature):
-
-    def __init__(self, app: web.Application):
-        super().__init__(app)
-        self._tasks: Set[asyncio.Task] = set()
-
-    async def startup(self, *_):
-        await self.create(self._cleanup())
-
-    async def shutdown(self, *_):
-        [task.cancel() for task in self._tasks]
-        await asyncio.wait(self._tasks)
-        self._tasks.clear()
-
-    async def _cleanup(self):
-        """
-        Periodically removes completed tasks from the collection,
-        allowing fire-and-forget tasks to be garbage collected.
-
-        This does not delete the task object, it merely removes the reference in the scheduler.
-        """
-        while True:
-            await asyncio.sleep(CLEANUP_INTERVAL_S)
-            self._tasks = {t for t in self._tasks if not t.done()}
-
-    async def create(self, coro: Coroutine) -> asyncio.Task:
-        """
-        Starts execution of a coroutine.
-
-        The created asyncio.Task is returned, and added to managed tasks.
-        The scheduler guarantees that it is cancelled during application shutdown,
-        regardless of whether it was already cancelled manually.
-
-        Args:
-            coro (Coroutine):
-                The coroutine to be wrapped in a task, and executed.
-
-        Returns:
-            asyncio.Task: An awaitable Task object.
-                During Aiohttp shutdown, the scheduler will attempt to cancel and await this task.
-                The task can be safely cancelled manually, or using `TaskScheduler.cancel(task)`.
-        """
-        task = asyncio.get_event_loop().create_task(coro)
-        self._tasks.add(task)
-        return task
-
-    async def cancel(self, task: asyncio.Task, wait_for: bool = True) -> Any:
-        """
-        Cancels and waits for an `asyncio.Task` to finish.
-        Removes it from the collection of managed tasks.
-
-        Args:
-            task (asyncio.Task):
-                The to be cancelled task.
-                It is not required that the task was was created with `TaskScheduler.create_task()`.
-
-            wait_for (bool, optional):
-                Whether to wait for the task to finish execution.
-                If falsey, this function returns immediately after cancelling the task.
-
-        Returns:
-            Any: The return value of `task`. None if `wait_for` is falsey.
-
-        """
-        if task is None:
-            return
-
-        task.cancel()
-
-        with suppress(KeyError):
-            self._tasks.remove(task)
-
-        with suppress(Exception, asyncio.CancelledError):
-            return (await task) if wait_for else None
+    return await get_scheduler(app).cancel(task, wait_for=wait_for)

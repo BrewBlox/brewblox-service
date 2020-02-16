@@ -25,6 +25,7 @@ Example use:
 
 import asyncio
 from abc import abstractmethod
+from typing import Optional
 
 from aiohttp import web
 
@@ -43,24 +44,23 @@ class RepeaterFeature(features.ServiceFeature):
 
     def __init__(self, app: web.Application):
         super().__init__(app)
-        self._task: asyncio.Task = None
-
-    def __str__(self):
-        return f'{type(self).__name__}'
+        self._task: Optional[asyncio.Task] = None
 
     @property
-    def active(self):
+    def active(self) -> bool:
+        """
+        Indicates whether the background task is currently running: not finished, not cancelled.
+        """
         return bool(self._task and not self._task.done())
 
     async def startup(self, app: web.Application):
         await self.shutdown(app)
-        self._task = await scheduler.create_task(app, self._repeat())
+        await self.start()
 
-    async def shutdown(self, _):
-        await scheduler.cancel_task(self.app, self._task)
-        self._task = None
+    async def shutdown(self, app: web.Application):
+        await self.end()
 
-    async def _repeat(self):
+    async def __repeat(self):
         last_ok = True
 
         try:
@@ -82,9 +82,6 @@ class RepeaterFeature(features.ServiceFeature):
                     LOGGER.info(f'{self} resumed OK')
                     last_ok = True
 
-            except asyncio.CancelledError:
-                return
-
             except RepeaterCancelled:
                 LOGGER.info(f'{self} cancelled during runtime.')
                 return
@@ -94,6 +91,23 @@ class RepeaterFeature(features.ServiceFeature):
                 if last_ok:
                     LOGGER.error(f'{self} error during runtime: {strex(ex)}')
                     last_ok = False
+
+    async def start(self):
+        """
+        Initializes the repeater task.
+        By default called during startup(), but implementations can choose to override this.
+        Will cancel the previous task if called repeatedly.
+        """
+        await self.end()
+        self._task = await scheduler.create(self.app, self.__repeat())
+
+    async def end(self):
+        """
+        Ends the repeater task.
+        Always called during shutdown(), but can be safely called earlier.
+        """
+        await scheduler.cancel(self.app, self._task)
+        self._task = None
 
     @abstractmethod
     async def prepare(self):

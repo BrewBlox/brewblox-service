@@ -1,19 +1,21 @@
 """
 Brewblox feature for the aiohttp client
 """
+from typing import Optional
 
 from aiohttp import ClientSession, web
+
 from brewblox_service import features
 
 
 class HTTPClient(features.ServiceFeature):
     def __init__(self, app: web.Application):
         super().__init__(app)
-        self._session: ClientSession = None
+        self._session: Optional[ClientSession] = None
 
     @property
     def session(self) -> ClientSession:
-        return self._session
+        return self._session  # type: ignore
 
     async def startup(self, app: web.Application):
         await self.shutdown(app)
@@ -31,3 +33,12 @@ def setup(app: web.Application):
 
 def get_client(app: web.Application) -> HTTPClient:
     return features.get(app, HTTPClient)
+
+
+def session(app: web.Application) -> ClientSession:
+    """Gets web.ClientSession for this app.
+
+    Shortcut for `HTTPClient.session`.
+    It requires setup() to have been called().
+    """
+    return get_client(app).session

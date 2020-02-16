@@ -4,16 +4,21 @@ Registers and gets features added to Aiohttp by brewblox services.
 
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import Any, Hashable, Type
+from functools import wraps
+from typing import Any, Hashable, Optional, Type, Union
 
 from aiohttp import web
 
+from brewblox_service import brewblox_logger
+
 FEATURES_KEY = '#features'
+
+LOGGER = brewblox_logger(__name__)
 
 
 def add(app: web.Application,
         feature: Any,
-        key: Hashable = None,
+        key: Optional[Union[Hashable, Type[Any]]] = None,
         exist_ok: bool = False
         ):
     """
@@ -54,8 +59,8 @@ def add(app: web.Application,
 
 
 def get(app: web.Application,
-        feature_type: Type[Any] = None,
-        key: Hashable = None
+        feature_type: Optional[Type[Any]] = None,
+        key: Optional[Hashable] = None
         ) -> Any:
     """
     Finds declared feature.
@@ -76,15 +81,15 @@ def get(app: web.Application,
     Returns:
         Any: The feature found for the combination of `feature_type` and `key`
     """
-    key = key or feature_type
+    actual: Union[Hashable, Type[Any], None] = key or feature_type
 
-    if not key:
+    if actual is None:
         raise AssertionError('No feature identifier provided')
 
     try:
-        found = app[FEATURES_KEY][key]
+        found = app[FEATURES_KEY][actual]
     except KeyError:
-        raise KeyError(f'No feature found for "{key}"')
+        raise KeyError(f'No feature found for "{actual}"')
 
     if feature_type and not isinstance(found, feature_type):
         raise AssertionError(f'Found {found} did not match type "{feature_type}"')
@@ -129,14 +134,14 @@ class ServiceFeature(ABC):
 
             async def startup(self, app: web.Application):
                 # Schedule a long-running background task
-                self._task = await scheduler.create_task(app, self._hello())
+                self._task = await scheduler.create(app, self._hello())
 
             async def before_shutdown(self, app: web.Application):
                 print('Any minute now...')
 
             async def shutdown(self, app: web.Application):
                 # Orderly cancel the background task
-                await scheduler.cancel_task(app, self._task)
+                await scheduler.cancel(app, self._task)
 
             async def _hello(self):
                 while True:
@@ -164,6 +169,15 @@ class ServiceFeature(ABC):
         # greeter.before_shutdown(app) will be called
         # greeter.shutdown(app) will be called
     """
+
+    def __hook(self, func, evt):
+        @wraps(func)
+        async def decorator(app):
+            LOGGER.debug(f'--> {evt} {self}')
+            retv = await func(app)
+            LOGGER.debug(f'<-- {evt} {self}')
+            return retv
+        return decorator
 
     def __init__(self, app: web.Application, startup=Startup.AUTODETECT):
         """
@@ -193,9 +207,12 @@ class ServiceFeature(ABC):
             startup == Startup.MANAGED,
             startup == Startup.AUTODETECT and not app.frozen
         ]):
-            app.on_startup.append(self.startup)
-            app.on_shutdown.append(self.before_shutdown)
-            app.on_cleanup.append(self.shutdown)
+            app.on_startup.append(self.__hook(self.startup, 'startup'))
+            app.on_shutdown.append(self.__hook(self.before_shutdown, 'before_shutdown'))
+            app.on_cleanup.append(self.__hook(self.shutdown, 'shutdown'))
+
+    def __str__(self):
+        return f'<{type(self).__name__}>'
 
     @property
     def app(self) -> web.Application:
@@ -219,7 +236,6 @@ class ServiceFeature(ABC):
             app (web.Application):
                 Current Aiohttp application.
         """
-        pass  # pragma: no cover
 
     async def before_shutdown(self, app: web.Application):
         """Lifecycle hook for preparing to shut down the feature.
@@ -233,10 +249,9 @@ class ServiceFeature(ABC):
             app (web.Application):
                 Current Aiohttp application.
         """
-        pass  # pragma: no cover
 
     @abstractmethod
-    async def shutdown(self, app: web.Application = None):
+    async def shutdown(self, app: web.Application):
         """Lifecycle hook for shutting down the feature before the event loop is closed.
 
         Subclasses are expected to override this function.
@@ -248,4 +263,3 @@ class ServiceFeature(ABC):
             app (web.Application):
                 Current Aiohttp application.
         """
-        pass  # pragma: no cover

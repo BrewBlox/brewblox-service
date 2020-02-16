@@ -22,6 +22,8 @@ pytest-aiohttp = "*"
 aresponses = "*"
 pytest = "*"
 brewblox-dev = "*"
+pytest-mypy = "*"
+flake8-quotes = "*"
 
 [requires]
 python_version = "3.8"
