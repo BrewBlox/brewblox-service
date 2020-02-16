@@ -75,7 +75,7 @@ def test_init_logging(mocker):
         call('aioamqp'),
         call().setLevel(log_mock.WARN),
         call('asyncio'),
-        call().setLevel(log_mock.CRITICAL),
+        call().setLevel(log_mock.WARN),
         call('aiohttp.access'),
         call().setLevel(log_mock.WARN),
     ])

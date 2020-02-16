@@ -27,20 +27,20 @@ async def test_create_cancel(app, client):
         return 'ok'
 
     ev = asyncio.Event()
-    task = await scheduler.create_task(app, do(ev))
+    task = await scheduler.create(app, do(ev))
     await ev.wait()
 
     assert [
-        await scheduler.cancel_task(app, task),
-        await scheduler.cancel_task(app, task),
-        await scheduler.cancel_task(app, task, False),
+        await scheduler.cancel(app, task),
+        await scheduler.cancel(app, task),
+        await scheduler.cancel(app, task, False),
     ] == ['ok', 'ok', None]
 
     # Create and forget
-    await scheduler.create_task(app, do(asyncio.Event()))
+    await scheduler.create(app, do(asyncio.Event()))
 
     # Cancelling None does not croak
-    await scheduler.cancel_task(app, None)
+    await scheduler.cancel(app, None)
 
 
 async def test_cleanup(app, client):
@@ -49,7 +49,7 @@ async def test_cleanup(app, client):
 
     sched = scheduler.get_scheduler(app)
     start_count = len(sched._tasks)
-    task = await scheduler.create_task(app, dummy())
+    task = await scheduler.create(app, dummy())
     await asyncio.sleep(0.01)
 
     assert task.done()
