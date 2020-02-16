@@ -3,7 +3,7 @@ from typing import Any, Optional, Tuple
 
 from aiohttp import client_exceptions, web
 
-from brewblox_service import brewblox_logger, features, http_client
+from brewblox_service import brewblox_logger, features, http
 
 LOGGER = brewblox_logger(__name__)
 
@@ -23,7 +23,7 @@ class CouchDBClient(features.ServiceFeature):
         pass
 
     async def check_remote(self):
-        session = http_client.session(self.app)
+        session = http.session(self.app)
         num_attempts = 0
         while True:
             try:
@@ -42,7 +42,7 @@ class CouchDBClient(features.ServiceFeature):
                    ) -> Tuple[str, Any]:
         db_url = f'{COUCH_URL}/{database}'
         document_url = f'{db_url}/{document}'
-        session = http_client.session(self.app)
+        session = http.session(self.app)
 
         async def ensure_database():
             try:
@@ -99,7 +99,7 @@ class CouchDBClient(features.ServiceFeature):
             raise ex
 
     async def write(self, database: str, document: str, rev: str, data: Any) -> str:
-        resp = await http_client.session(self.app).put(
+        resp = await http.session(self.app).put(
             url=f'{COUCH_URL}/{database}/{document}',
             json={'data': data},
             params=[('rev', rev)]
