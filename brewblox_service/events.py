@@ -172,11 +172,11 @@ class EventListener(repeater.RepeaterFeature):
         Overrides RepeaterFeature.run().
         This function will be called in a loop in a background Task.
         """
-        try:
-            transport: asyncio.Transport
-            protocol: aioamqp.AmqpProtocol
-            channel: aioamqp.channel.Channel
+        transport: asyncio.Transport = None
+        protocol: aioamqp.AmqpProtocol = None
+        channel: aioamqp.channel.Channel = None
 
+        try:
             transport, protocol = await aioamqp.connect(
                 host=self._host,
                 port=self._port,
@@ -224,8 +224,8 @@ class EventListener(repeater.RepeaterFeature):
             await asyncio.sleep(RECONNECT_INTERVAL.seconds)
 
         finally:
-            await protocol.close()
-            transport.close()
+            protocol and await protocol.close()
+            transport and transport.close()
 
     def subscribe(self,
                   exchange_name: str,
