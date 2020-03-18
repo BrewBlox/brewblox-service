@@ -30,25 +30,26 @@ steps:
     architecture: 'x64'
 
 - bash: |
+    set -o allexport; source .env; set +o allexport
     BRANCH=$(echo $(Build.SourceBranch) | grep -oP "^refs/heads/\K.*")
     RELEASE=$(git describe --tags | grep "^[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]$")
     TAG=$(echo $BRANCH | tr '/' '-' | tr '[:upper:]' '[:lower:]')
-    set -o allexport; source .env; set +o allexport
-    echo "##vso[task.setvariable variable=brewblox.image]$DOCKER_REPO"
-    echo "##vso[task.setvariable variable=brewblox.branch]$BRANCH"
-    echo "##vso[task.setvariable variable=brewblox.release]$RELEASE"
-    echo "##vso[task.setvariable variable=brewblox.tag]#TAG"
+    echo "##vso[task.setvariable variable=DOCKER_REPO]$DOCKER_REPO"
+    echo "##vso[task.setvariable variable=GITHUB_REPO]$GITHUB_REPO"
+    echo "##vso[task.setvariable variable=BRANCH]$BRANCH"
+    echo "##vso[task.setvariable variable=RELEASE]$RELEASE"
+    echo "##vso[task.setvariable variable=TAG]$TAG"
   displayName: export build variables
 
 - bash: |
     pip install pipenv
     pipenv install --system --dev --deploy
-    pytest
-  displayName: Run Pytest
-
-- bash: |
     python setup.py sdist
   displayName: Build Python package
+
+- bash: |
+    pytest
+  displayName: Run Pytest
 
 - bash: |
     echo $(DOCKER_PASSWORD) | docker login -u $(DOCKER_USER) --password-stdin
@@ -60,18 +61,18 @@ steps:
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
     docker buildx create --use
     docker buildx inspect --bootstrap
-    docker buildx build --tag $(brewblox.image):$(brewblox.tag) --push --platform linux/amd64,linux/arm/v7 docker
+    docker buildx build --tag $(DOCKER_REPO):$(TAG) --push --platform linux/amd64,linux/arm/v7 docker
   displayName: Deploy branch to Docker Hub on any push to the GitHub repository
-  condition: and(succeeded(), variables['brewblox.branch'], not(variables['brewblox.release']))
+  condition: and(succeeded(), variables['BRANCH'], not(variables['RELEASE']))
   env:
     DOCKER_CLI_EXPERIMENTAL: enabled
 # - bash: >
 #     brewblox-dev localbuild
 #     --arch amd --arch arm
-#     --tag newest-tag --tag $(brewblox.release)
+#     --tag newest-tag --tag $(RELEASE)
 #     --push
 #   displayName: Deploy newest-tag and version tag to Docker Hub on tagged commits
-#   condition: and(succeeded(), variables['brewblox.release'])
+#   condition: and(succeeded(), variables['RELEASE'])
 
 # - bash: >
 #     brewblox-dev localbuild
@@ -79,10 +80,10 @@ steps:
 #     --branch-tag
 #     --push
 #   displayName: Deploy branch to Docker Hub on any push to the GitHub repository
-#   condition: and(succeeded(), variables['brewblox.branch'], not(variables['brewblox.release']))
+#   condition: and(succeeded(), variables['BRANCH'], not(variables['RELEASE']))
 #   env:
 #   # brewblox-tools looks for $TRAVIS_BRANCH to determine branch tag
-#     TRAVIS_BRANCH: $(brewblox.branch)
+#     TRAVIS_BRANCH: $(BRANCH)
 
 - bash: |
     pip install twine
