@@ -57,6 +57,8 @@ steps:
   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
 - bash: |
+    docker --version
+    echo $DOCKER_CLI_EXPERIMENTAL
     pipenv lock --requirements > docker/requirements.txt
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
     docker buildx create --use
