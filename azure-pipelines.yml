@@ -75,17 +75,6 @@ steps:
   displayName: Docker login
   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
-- bash: |
-    if [ -f ./localbuild.sh ]; then
-      bash ./localbuild.sh
-    fi
-    if [ -f ./before_build.sh ]; then
-      bash ./before_build.sh
-    fi
-  displayName: Run before_build.sh script
-  workingDirectory: docker
-  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
-
 - bash: >-
     docker buildx build
     --tag $(DOCKER_REPO):$(TAG)
@@ -99,8 +88,8 @@ steps:
 
 - bash: >-
     docker buildx build
-    --tag newest-tag
-    --tag rpi-newest-tag
+    --tag $(DOCKER_REPO):newest-tag
+    --tag $(DOCKER_REPO):rpi-newest-tag
     --tag $(DOCKER_REPO):$(RELEASE)
     --tag $(DOCKER_REPO):rpi-$(RELEASE)
     --build-arg service_info="$(git describe) @ $(date)"
