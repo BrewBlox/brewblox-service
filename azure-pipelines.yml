@@ -75,6 +75,17 @@ steps:
   displayName: Docker login
   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
+- bash: |
+    if [ -f ./localbuild.sh ]; then
+      bash ./localbuild.sh
+    fi
+    if [ -f ./before_build.sh ]; then
+      bash ./before_build.sh
+    fi
+  displayName: Run before_build.sh script
+  workingDirectory: docker
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+
 - bash: >-
     docker buildx build
     --tag $(DOCKER_REPO):$(TAG)
@@ -83,7 +94,7 @@ steps:
     --push
     --platform linux/amd64,linux/arm/v7
     docker
-  displayName: Deploy Docker image with branch tags
+  displayName: Deploy Docker images with branch tags
   condition: and(succeeded(), variables['BRANCH'], not(variables['RELEASE']))
 
 - bash: >-
@@ -96,7 +107,7 @@ steps:
     --push
     --platform linux/amd64,linux/arm/v7
     docker
-  displayName: Deploy Docker image with release tags
+  displayName: Deploy Docker images with release tags
   condition: and(succeeded(), variables['RELEASE'])
 
 - bash: |
