@@ -51,14 +51,14 @@ steps:
 
 - bash: |
     pytest
-  displayName: Run Pytest
+  displayName: Run pytest
 
+# mv buildx ~/.docker/cli-plugins/docker-buildx
+# docker build --platform=local -o . git://github.com/docker/buildx
 - bash: |
-    # docker build --platform=local -o . git://github.com/docker/buildx
     mkdir -p ~/.docker/cli-plugins/
-    curl -sL -o ~/.docker/cli-plugins/buildx https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
+    curl -L -o ~/.docker/cli-plugins/buildx https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
     chmod +x ~/.docker/cli-plugins/buildx
-    # mv buildx ~/.docker/cli-plugins/docker-buildx
     docker buildx --help
   displayName: Install buildx
 
