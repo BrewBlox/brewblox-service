@@ -57,8 +57,8 @@ steps:
 # docker build --platform=local -o . git://github.com/docker/buildx
 - bash: |
     mkdir -p ~/.docker/cli-plugins/
-    curl -L -o ~/.docker/cli-plugins/buildx https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
-    chmod +x ~/.docker/cli-plugins/buildx
+    curl -L -o ~/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
+    chmod +x ~/.docker/cli-plugins/docker-buildx
     docker buildx --help
   displayName: Install buildx
 
