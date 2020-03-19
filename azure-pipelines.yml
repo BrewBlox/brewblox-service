@@ -31,15 +31,18 @@ steps:
 
 - bash: |
     set -o allexport; source .env; set +o allexport
-    BRANCH=$(echo $(Build.SourceBranch) | grep -oP "^refs/heads/\K.*")
-    RELEASE=$(git describe --tags | grep "^[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]$")
-    TAG=$(echo $BRANCH | tr '/' '-' | tr '[:upper:]' '[:lower:]')
     echo "##vso[task.setvariable variable=DOCKER_REPO]$DOCKER_REPO"
     echo "##vso[task.setvariable variable=GITHUB_REPO]$GITHUB_REPO"
-    echo "##vso[task.setvariable variable=BRANCH]$BRANCH"
+  displayName: Export .env variables
+
+- bash: |
+    RELEASE=$(git describe --tags | grep "^[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]$")
+    BRANCH=$(echo $(Build.SourceBranch) | grep -oP "^refs/heads/\K.*")
+    TAG=$(echo $BRANCH | tr '/' '-' | tr '[:upper:]' '[:lower:]')
     echo "##vso[task.setvariable variable=RELEASE]$RELEASE"
+    echo "##vso[task.setvariable variable=BRANCH]$BRANCH"
     echo "##vso[task.setvariable variable=TAG]$TAG"
-  displayName: export build variables
+  displayName: Export build variables
 
 - bash: |
     pip install pipenv
@@ -47,14 +50,8 @@ steps:
     python setup.py sdist
   displayName: Build Python package
 
-- bash: |
-    pytest
-  displayName: Run pytest
-
-- bash: |
-    echo $(DOCKER_PASSWORD) | docker login -u $(DOCKER_USER) --password-stdin
-  displayName: Docker login
-  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+- bash: pytest
+  displayName: Run Pytest
 
 - bash: |
     pipenv lock --requirements > docker/requirements.txt
@@ -68,10 +65,15 @@ steps:
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
     docker buildx create --use
     docker buildx inspect --bootstrap
-  displayName: Install buildx
+  displayName: Prepare buildx
   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
   env:
     BUILDX_URL: https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
+
+- bash: |
+    echo $(DOCKER_PASSWORD) | docker login -u $(DOCKER_USER) --password-stdin
+  displayName: Docker login
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
 - bash: >-
     docker buildx build
