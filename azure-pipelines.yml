@@ -21,8 +21,6 @@ variables:
   # PYPI_USER
   # PYPI_PASSWORD
   - group: brewblox
-  - name: DOCKER_BUILDKIT
-    value: 1
 
 steps:
 - task: UsePythonVersion@0
@@ -54,48 +52,50 @@ steps:
   displayName: Run pytest
 
 - bash: |
-    curl -L -o ~/.docker/cli-plugins/docker-buildx --create-dirs ${BUILDX_URL}
-    chmod a+x ~/.docker/cli-plugins/docker-buildx
-  displayName: Install buildx
-  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
-  env:
-    BUILDX_URL: https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
-
-- bash: |
     echo $(DOCKER_PASSWORD) | docker login -u $(DOCKER_USER) --password-stdin
   displayName: Docker login
   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
 - bash: |
     pipenv lock --requirements > docker/requirements.txt
-    cp -r dist/ docker/
+    cp -rf dist/ docker/
   displayName: Copy files to docker context
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
 - bash: |
+    curl -L -o ~/.docker/cli-plugins/docker-buildx --create-dirs ${BUILDX_URL}
+    chmod a+x ~/.docker/cli-plugins/docker-buildx
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
     docker buildx create --use
     docker buildx inspect --bootstrap
-    docker buildx build --tag $(DOCKER_REPO):$(TAG) --push --platform linux/amd64,linux/arm/v7 docker
-  displayName: Deploy branch to Docker Hub on any push to the GitHub repository
-  condition: and(succeeded(), variables['BRANCH'], not(variables['RELEASE']))
-# - bash: >
-#     brewblox-dev localbuild
-#     --arch amd --arch arm
-#     --tag newest-tag --tag $(RELEASE)
-#     --push
-#   displayName: Deploy newest-tag and version tag to Docker Hub on tagged commits
-#   condition: and(succeeded(), variables['RELEASE'])
+  displayName: Install buildx
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  env:
+    BUILDX_URL: https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
 
-# - bash: >
-#     brewblox-dev localbuild
-#     --arch amd --arch arm
-#     --branch-tag
-#     --push
-#   displayName: Deploy branch to Docker Hub on any push to the GitHub repository
-#   condition: and(succeeded(), variables['BRANCH'], not(variables['RELEASE']))
-#   env:
-#   # brewblox-tools looks for $TRAVIS_BRANCH to determine branch tag
-#     TRAVIS_BRANCH: $(BRANCH)
+- bash: >-
+    docker buildx build
+    --tag $(DOCKER_REPO):$(TAG)
+    --tag $(DOCKER_REPO):rpi-$(TAG)
+    --build-arg service_info="$(git describe) @ $(date)"
+    --push
+    --platform linux/amd64,linux/arm/v7
+    docker
+  displayName: Deploy Docker image with branch tags
+  condition: and(succeeded(), variables['BRANCH'], not(variables['RELEASE']))
+
+- bash: >-
+    docker buildx build
+    --tag newest-tag
+    --tag rpi-newest-tag
+    --tag $(DOCKER_REPO):$(RELEASE)
+    --tag $(DOCKER_REPO):rpi-$(RELEASE)
+    --build-arg service_info="$(git describe) @ $(date)"
+    --push
+    --platform linux/amd64,linux/arm/v7
+    docker
+  displayName: Deploy Docker image with release tags
+  condition: and(succeeded(), variables['RELEASE'])
 
 - bash: |
     pip install twine
