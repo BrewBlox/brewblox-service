@@ -5,13 +5,13 @@ Tests functionality offered by brewblox_service.events
 import asyncio
 import json
 from datetime import timedelta
-from unittest.mock import AsyncMock, Mock, call
 
 import aioamqp
 import pytest
 
 from brewblox_service import events, scheduler
 from brewblox_service.testing import response
+from mock import AsyncMock, Mock, call
 
 TESTED = events.__name__
 

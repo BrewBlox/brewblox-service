@@ -66,6 +66,9 @@ class RepeaterFeature(features.ServiceFeature):
         try:
             await self.prepare()
 
+        except asyncio.CancelledError:
+            raise
+
         except RepeaterCancelled:
             LOGGER.info(f'{self} cancelled during setup.')
             return
@@ -81,6 +84,9 @@ class RepeaterFeature(features.ServiceFeature):
                 if not last_ok:
                     LOGGER.info(f'{self} resumed OK')
                     last_ok = True
+
+            except asyncio.CancelledError:
+                raise
 
             except RepeaterCancelled:
                 LOGGER.info(f'{self} cancelled during runtime.')

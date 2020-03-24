@@ -24,7 +24,7 @@ import json
 import queue
 import warnings
 from datetime import timedelta
-from typing import Callable, Coroutine, List, Literal, Optional, Union
+from typing import Callable, Coroutine, List, Optional, Union
 
 import aioamqp
 from aiohttp import web
@@ -35,7 +35,7 @@ LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
 
 EvtCallbackType_ = Callable[['EventSubscription', str, Union[dict, str]], Coroutine]
-ExchangeType_ = Literal['topic', 'fanout', 'direct']
+ExchangeType_ = str  # Literal['topic', 'fanout', 'direct']
 
 RECONNECT_INTERVAL = timedelta(seconds=1)
 PENDING_WAIT_TIMEOUT = timedelta(seconds=5)
@@ -215,6 +215,9 @@ class EventListener(repeater.RepeaterFeature):
                     # We'll declare it after reconnect
                     self._pending.put_nowait(subscription)
                     raise
+
+        except asyncio.CancelledError:
+            raise
 
         except Exception as ex:
             if self._last_ok:
