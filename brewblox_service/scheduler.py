@@ -48,7 +48,8 @@ class TaskScheduler(features.ServiceFeature):
                      ) -> asyncio.Task:
         try:
             task = asyncio.create_task(coro, name=name)
-        except TypeError:  # The name argument was introduced in Python 3.8
+        except TypeError:  # pragma: no cover
+            # The name argument was introduced in Python 3.8
             task = asyncio.create_task(coro)
         LOGGER.debug(f'Scheduled {task}')
         self._tasks.add(task)
