@@ -52,6 +52,7 @@ steps:
 - bash: |
     pip install -U pip
     pip install poetry
+    poetry env use system
     poetry build --format sdist
   displayName: Build Python package
 
@@ -81,6 +82,7 @@ steps:
 - bash: >-
     docker buildx build
     --tag $(DOCKER_REPO):$(python.version)-$(TAG)
+    --tag $(DOCKER_REPO):$(python.version)-$(poetry version | cut -d ' ' -f2)
     --build-arg python_version="$(python.version)"
     --build-arg service_info="$(VERSION) @ $(date)"
     --push
