@@ -56,7 +56,7 @@ steps:
     poetry build --format sdist
   displayName: Build Python package
 
-- bash: pytest
+- bash: poetry run pytest
   displayName: Run Pytest
 
 - bash: cp -rf dist/ docker/
