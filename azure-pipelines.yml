@@ -50,9 +50,9 @@ steps:
   displayName: Export build variables
 
 - bash: |
-    pip install -U pip
     pip install poetry
     poetry env use system
+    poetry install
     poetry build --format sdist
   displayName: Build Python package
 
