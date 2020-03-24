@@ -8,10 +8,10 @@ from datetime import timedelta
 
 import aioamqp
 import pytest
-from mock import AsyncMock, Mock, call
 
 from brewblox_service import events, scheduler
 from brewblox_service.testing import response
+from mock import AsyncMock, Mock, call
 
 TESTED = events.__name__
 

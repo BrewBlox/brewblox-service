@@ -4,6 +4,7 @@ version = "0.24.2"
 description = "Scaffolding for Brewblox backend services"
 authors = ["BrewPi <development@brewpi.com>"]
 license = "GPL-3.0"
+readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.7"
