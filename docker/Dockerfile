@@ -13,7 +13,6 @@ RUN pip3 install wheel \
     && \
     pip3 wheel \
     --wheel-dir=/wheeley-base \
-    --extra-index-url=https://www.piwheels.org/simple \
     /build/dist/* \
     && \
     pip3 install \
