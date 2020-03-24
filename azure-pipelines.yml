@@ -1,6 +1,13 @@
 pool:
   vmImage: 'Ubuntu-18.04'
 
+strategy:
+  matrix:
+    Python37:
+      python.version: '3.7'
+    Python38:
+      python.version: '3.8'
+
 trigger:
   tags:
     include:
@@ -26,7 +33,7 @@ steps:
 - task: UsePythonVersion@0
   inputs:
     addToPath: true
-    versionSpec: '3.8'
+    versionSpec: '$(python.version)'
     architecture: 'x64'
 
 - bash: |
@@ -36,26 +43,24 @@ steps:
   displayName: Export .env variables
 
 - bash: |
-    RELEASE=$(git describe --tags | grep "^[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]$")
+    VERSION=$(poetry version | cut -d ' ' -f2)
     BRANCH=$(echo $(Build.SourceBranch) | grep -oP "^refs/heads/\K.*")
     TAG=$(echo $BRANCH | tr '/' '-' | tr '[:upper:]' '[:lower:]')
-    echo "##vso[task.setvariable variable=RELEASE]$RELEASE"
+    echo "##vso[task.setvariable variable=VERSION]$VERSION"
     echo "##vso[task.setvariable variable=BRANCH]$BRANCH"
     echo "##vso[task.setvariable variable=TAG]$TAG"
   displayName: Export build variables
 
 - bash: |
-    pip install pipenv
-    pipenv install --system --dev --deploy
-    python setup.py sdist
+    pip install -U pip
+    pip install poetry
+    poetry build --format sdist
   displayName: Build Python package
 
 - bash: pytest
   displayName: Run Pytest
 
-- bash: |
-    pipenv lock --requirements > docker/requirements.txt
-    cp -rf dist/ docker/
+- bash: cp -rf dist/ docker/
   displayName: Copy files to docker context
   condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
@@ -79,28 +84,32 @@ steps:
     docker buildx build
     --tag $(DOCKER_REPO):$(TAG)
     --tag $(DOCKER_REPO):rpi-$(TAG)
-    --build-arg service_info="$(git describe) @ $(date)"
+    --build-arg python_version="$(python.version)"
+    --build-arg service_info="$(VERSION) @ $(date)"
     --push
     --platform linux/amd64,linux/arm/v7
     docker
   displayName: Deploy Docker images with branch tags
-  condition: and(succeeded(), variables['BRANCH'], not(variables['RELEASE']))
+  condition: and(succeeded(), variables['BRANCH'], neq(variables['BRANCH'], 'develop'))
 
 - bash: >-
     docker buildx build
+    --tag $(DOCKER_REPO):$(TAG)
+    --tag $(DOCKER_REPO):rpi-$(TAG)
     --tag $(DOCKER_REPO):newest-tag
     --tag $(DOCKER_REPO):rpi-newest-tag
-    --tag $(DOCKER_REPO):$(RELEASE)
-    --tag $(DOCKER_REPO):rpi-$(RELEASE)
-    --build-arg service_info="$(git describe) @ $(date)"
+    --tag $(DOCKER_REPO):$(VERSION)
+    --tag $(DOCKER_REPO):rpi-$(VERSION)
+    --build-arg python_version="$(python.version)"
+    --build-arg service_info="$(VERSION) @ $(date)"
     --push
     --platform linux/amd64,linux/arm/v7
     docker
-  displayName: Deploy Docker images with release tags
-  condition: and(succeeded(), variables['RELEASE'])
+  displayName: Deploy Docker images with release tags if on develop
+  condition: and(succeeded(), eq(variables['BRANCH'], 'develop'))
 
 - bash: |
     pip install twine
     twine upload -u $(PYPI_USER) -p $(PYPI_PASSWORD) --skip-existing dist/*
   displayName: Deploy to PyPi
-  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['python.version'], '3.7'))

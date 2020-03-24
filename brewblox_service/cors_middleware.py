@@ -3,6 +3,8 @@ Cross Origin Resource Sharing (CORS) headers must be present when using multiple
 This middleware automatically returns OPTIONS requests, and appends other requests with the correct headers.
 """
 
+import asyncio
+
 from aiohttp import hdrs, web, web_exceptions
 
 from brewblox_service import brewblox_logger, strex
@@ -32,6 +34,8 @@ async def cors_middleware(request: web.Request, handler) -> web.Response:
     else:
         try:
             response = await handler(request)
+        except asyncio.CancelledError:
+            raise
         except web_exceptions.HTTPError as ex:
             response = ex
         except Exception as ex:
