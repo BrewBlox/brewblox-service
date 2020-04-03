@@ -21,6 +21,7 @@ Example use:
 
 import asyncio
 import json
+import logging
 import queue
 import warnings
 from datetime import timedelta
@@ -323,6 +324,7 @@ class EventPublisher(features.ServiceFeature):
 
     async def _close(self):
         LOGGER.info(f'Closing {self}')
+        logging.getLogger('aioamqp.protocol').disabled = True
 
         try:
             await self._protocol.close(no_wait=True)
@@ -334,6 +336,7 @@ class EventPublisher(features.ServiceFeature):
 
     async def _ensure_channel(self):
         if not self.connected:
+            logging.getLogger('aioamqp.protocol').disabled = False
             self._transport, self._protocol = await aioamqp.connect(
                 host=self._host,
                 port=self._port,
