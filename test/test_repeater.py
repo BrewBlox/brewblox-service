@@ -38,7 +38,7 @@ class ResumeDummy(RepeaterDummy):
 
 
 @pytest.fixture
-async def app(app):
+def app(app):
     scheduler.setup(app)
 
     dummy = RepeaterDummy(app)

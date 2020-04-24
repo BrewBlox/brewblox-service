@@ -8,7 +8,7 @@ from brewblox_service import service, testing
 
 
 @pytest.fixture
-async def app(app, mocker):
+def app(app, mocker):
     service.furnish(app)
     return app
 
