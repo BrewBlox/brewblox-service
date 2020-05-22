@@ -58,9 +58,9 @@ def app(sys_args):
 
 
 @pytest.fixture
-def client(app, aiohttp_client, loop):
+async def client(app, aiohttp_client, loop):
     """Allows patching the app or aiohttp_client before yielding it.
 
     Any tests wishing to add custom behavior to app can override the fixture
     """
-    return loop.run_until_complete(aiohttp_client(app))
+    return await aiohttp_client(app)

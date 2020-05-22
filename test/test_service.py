@@ -23,7 +23,7 @@ class DummyFeature(features.ServiceFeature):
 
 
 @pytest.fixture
-async def app(app, mocker):
+def app(app, mocker):
     app.router.add_static(prefix='/static', path='/usr')
     features.add(app, DummyFeature(app))
     service.furnish(app)
@@ -75,7 +75,7 @@ def test_init_logging(mocker):
         call('aioamqp'),
         call().setLevel(log_mock.WARN),
         call('asyncio'),
-        call().setLevel(log_mock.CRITICAL),
+        call().setLevel(log_mock.WARN),
         call('aiohttp.access'),
         call().setLevel(log_mock.WARN),
     ])
@@ -160,7 +160,7 @@ async def test_error_cors(app, client, mocker):
         await client.get('/test_app/_service/status')
 
 
-def test_run(app, mocker, loop):
+def test_run(app, mocker):
     run_mock = mocker.patch(TESTED + '.web.run_app')
     service.run(app)
     run_mock.assert_called_once_with(app, host='0.0.0.0', port=1234)

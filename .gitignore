@@ -65,6 +65,8 @@ target/
 # pyenv
 .python-version
 .idea/
+.venv
 
-# pytest
+# testing
 .pytest_cache/
+.mypy_cache/

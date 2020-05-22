@@ -1,4 +1,4 @@
-# Scaffolding for BrewBlox service applications
+# Scaffolding for Brewblox service applications
 
 In order to reduce code duplication between services, generic functionality is implemented here.
 

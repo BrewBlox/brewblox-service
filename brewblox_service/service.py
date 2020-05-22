@@ -30,10 +30,11 @@ import sys  # noqa
 import warnings
 from logging.handlers import TimedRotatingFileHandler
 from os import getenv
-from typing import List
+from typing import List, Optional, Set
 
 import aiohttp_swagger
 from aiohttp import web
+from aiohttp.web import AbstractResource
 
 from brewblox_service import brewblox_logger, cors_middleware, features
 
@@ -62,7 +63,7 @@ def _init_logging(args: argparse.Namespace):
 
     if not args.debug:
         logging.getLogger('aioamqp').setLevel(logging.WARN)
-        logging.getLogger('asyncio').setLevel(logging.CRITICAL)
+        logging.getLogger('asyncio').setLevel(logging.WARN)
         logging.getLogger('aiohttp.access').setLevel(logging.WARN)
 
 
@@ -110,7 +111,7 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
 def create_app(
         default_name: str = None,
         parser: argparse.ArgumentParser = None,
-        raw_args: List[str] = None
+        raw_args: Optional[List[str]] = None
 ) -> web.Application:
     """
     Creates and configures an Aiohttp application.
@@ -165,9 +166,9 @@ def furnish(app: web.Application):
     cors_middleware.enable_cors(app)
 
     # Configure CORS and prefixes on all endpoints.
-    known_resources = set()
+    known_resources: Set[AbstractResource] = set()
     for route in list(app.router.routes()):
-        if route.resource in known_resources:
+        if route.resource is None or route.resource in known_resources:
             continue
         known_resources.add(route.resource)
         route.resource.add_prefix(prefix)

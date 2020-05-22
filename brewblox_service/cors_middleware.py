@@ -3,7 +3,7 @@ Cross Origin Resource Sharing (CORS) headers must be present when using multiple
 This middleware automatically returns OPTIONS requests, and appends other requests with the correct headers.
 """
 
-from asyncio import CancelledError
+import asyncio
 
 from aiohttp import hdrs, web, web_exceptions
 
@@ -27,15 +27,15 @@ def set_cors_headers(request, response):
 
 
 @web.middleware
-async def cors_middleware(request: web.Request, handler: web.RequestHandler) -> web.Response:
+async def cors_middleware(request: web.Request, handler) -> web.Response:
     # preflight requests
     if request.method == 'OPTIONS':
         return set_cors_headers(request, web.Response())
     else:
         try:
             response = await handler(request)
-        except CancelledError:
-            raise  # Client abandoned request - we're not returning a response anymore
+        except asyncio.CancelledError:
+            raise
         except web_exceptions.HTTPError as ex:
             response = ex
         except Exception as ex:
