@@ -360,7 +360,8 @@ class EventPublisher(features.ServiceFeature):
                       exchange: str,
                       routing: str,
                       message: Union[str, dict],
-                      exchange_type: ExchangeType_ = 'topic'):
+                      exchange_type: ExchangeType_ = 'topic',
+                      exchange_declare: bool = True):
         """
         Publish a new event message.
 
@@ -388,6 +389,11 @@ class EventPublisher(features.ServiceFeature):
                 `exchange_type` defines how the exchange distributes messages between subscribers.
                 The default is 'topic', and acceptable values are: 'topic', 'direct', or 'fanout'.
 
+            exchange_declare (bool):
+                Whether to declare the exchange.
+                This is not required when using built-in exchanges such as 'amq.topic'.
+                Defaults to True.
+
         Raises:
             aioamqp.exceptions.AioamqpException:
                 * Failed to connect to AMQP host
@@ -404,11 +410,12 @@ class EventPublisher(features.ServiceFeature):
         # json.dumps() also correctly handles strings
         data = json.dumps(message).encode()
 
-        await self._channel.exchange_declare(
-            exchange_name=exchange,
-            type_name=exchange_type,
-            auto_delete=True,
-        )
+        if exchange_declare:
+            await self._channel.exchange_declare(
+                exchange_name=exchange,
+                type_name=exchange_type,
+                auto_delete=True,
+            )
 
         await self._channel.basic_publish(
             payload=data,
@@ -507,7 +514,8 @@ async def publish(app: web.Application,
                   exchange: str,
                   routing: str,
                   message: Union[str, dict],
-                  exchange_type: ExchangeType_ = 'topic'):
+                  exchange_type: ExchangeType_ = 'topic',
+                  exchange_declare: bool = True):
     """
     Publish a new event message.
 
@@ -541,6 +549,11 @@ async def publish(app: web.Application,
             `exchange_type` defines how the exchange distributes messages between subscribers.
             The default is 'topic', and acceptable values are: 'topic', 'direct', or 'fanout'.
 
+        exchange_declare (bool):
+            Whether to declare the exchange.
+            This is not required when using built-in exchanges such as 'amq.topic'.
+            Defaults to True.
+
     Raises:
         aioamqp.exceptions.AioamqpException:
             * Failed to connect to AMQP host
@@ -550,7 +563,8 @@ async def publish(app: web.Application,
     await get_publisher(app).publish(exchange,
                                      routing,
                                      message,
-                                     exchange_type)
+                                     exchange_type,
+                                     exchange_declare)
 
 
 ##############################################################################
