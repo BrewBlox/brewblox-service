@@ -8,10 +8,10 @@ from datetime import timedelta
 
 import aioamqp
 import pytest
+from mock import AsyncMock, Mock, call
 
 from brewblox_service import events, scheduler
 from brewblox_service.testing import response
-from mock import AsyncMock, Mock, call
 
 TESTED = events.__name__
 
@@ -148,6 +148,7 @@ async def test_online_publisher(app, client, mocker):
 
     await publisher.publish('exchange', 'key', message=dict(key='val'))
     await publisher.publish('exchange', 'key', message=dict(key='val'))
+    await publisher.publish('exchange', 'key', message=dict(key='val'), exchange_declare=False)
 
 
 async def test_publish_endpoint(app, client, mocker, m_channel):
