@@ -99,12 +99,34 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
                            help='Run the app in debug mode. [%(default)s]',
                            action='store_true')
     argparser.add_argument('--eventbus-host',
-                           help='Hostname at which the eventbus can be reached [%(default)s]',
+                           help='[Deprecated] Hostname at which the AMQP eventbus can be reached [%(default)s]',
                            default='eventbus')
     argparser.add_argument('--eventbus-port',
-                           help='Port at which the eventbus can be reached [%(default)s]',
+                           help='[Deprecated] Port at which the AMQP eventbus can be reached [%(default)s]',
                            default=5672,
                            type=int)
+
+    group = argparser.add_argument_group('MQTT Event handling')
+    group.add_argument('--mqtt-protocol',
+                       help='Transport protocol used for MQTT events. [%(default)s]',
+                       choices=['mqtt', 'mqtts', 'ws', 'wss'],
+                       default='mqtt')
+    group.add_argument('--mqtt-host',
+                       help='Hostname at which the eventbus can be reached [%(default)s]',
+                       default='eventbus')
+    group.add_argument('--mqtt-port',
+                       help='Port at which the eventbus can be reached [%(default)s]',
+                       default=1883,
+                       type=int)
+    group.add_argument('--mqtt-path',
+                       help='Path used for MQTT events. Only applies if a websockets protocol is used. [%(default)s]',
+                       default='/eventbus')
+    group.add_argument('--history-topic',
+                       help='Eventbus exchange to which logged controller state is broadcast. [%(default)s]',
+                       default='brewcast/history')
+    group.add_argument('--state-topic',
+                       help='Eventbus topic to which volatile controller state is broadcast. [%(default)s]',
+                       default='brewcast/state')
     return argparser
 
 

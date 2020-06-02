@@ -8,10 +8,9 @@ from datetime import timedelta
 
 import aioamqp
 import pytest
-from mock import AsyncMock, Mock, call
+from mock import AsyncMock, Mock
 
 from brewblox_service import events, scheduler
-from brewblox_service.testing import response
 
 TESTED = events.__name__
 
@@ -147,57 +146,8 @@ async def test_online_publisher(app, client, mocker):
     await publisher.startup(app)
 
     await publisher.publish('exchange', 'key', message=dict(key='val'))
-    await publisher.publish('exchange', 'key', message=dict(key='val'))
+    await events.publish(app, 'exchange', 'key', message=dict(key='val'))
     await publisher.publish('exchange', 'key', message=dict(key='val'), exchange_declare=False)
-
-
-async def test_publish_endpoint(app, client, mocker, m_channel):
-    # standard ok
-    await response(client.post('/_debug/publish', json=dict(
-        exchange='exchange',
-        routing='first',
-        message=dict(key='val')
-    )))
-
-    # string messages supported
-    await response(client.post('/_debug/publish', json=dict(
-        exchange='exchange',
-        routing='second',
-        message='message'
-    )))
-
-    mocker.patch.object(events.get_publisher(app),
-                        '_ensure_channel',
-                        AsyncMock(side_effect=RuntimeError))
-
-    await response(client.post('/_debug/publish', json=dict(
-        exchange='exchange',
-        routing='first',
-        message=dict(key='val')
-    )), 500)
-
-    msg1 = json.dumps({'key': 'val'}).encode()
-    msg2 = json.dumps('message').encode()
-
-    m_channel.basic_publish.assert_has_calls([
-        call(payload=msg1, exchange_name='exchange', routing_key='first'),
-        call(payload=msg2, exchange_name='exchange', routing_key='second'),
-    ])
-
-
-async def test_subscribe_endpoint(app, client, m_channel):
-    await response(client.post('/_debug/subscribe', json=dict(
-        exchange='exchange',
-        routing='routing.key'
-    )))
-
-    await asyncio.sleep(0.01)
-
-    m_channel.queue_bind.assert_awaited_once_with(
-        queue_name='queue_name',
-        exchange_name='exchange',
-        routing_key='routing.key'
-    )
 
 
 async def test_listener_exceptions(app, client, m_protocol, m_channel, m_transport, mocked_connect):

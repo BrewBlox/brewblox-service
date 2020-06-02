@@ -1,4 +1,6 @@
 """
+DEPRECATED: USE THE MQTT MODULE INSTEAD.
+
 Offers event publishing and subscription for service implementations.
 
 Example use:
@@ -18,7 +20,6 @@ Example use:
     await events.publish(app, 'brewblox', 'controller.value', {'example': True})
 
 """
-
 import asyncio
 import json
 import logging
@@ -29,6 +30,7 @@ from typing import Callable, Coroutine, List, Optional, Union
 
 import aioamqp
 from aiohttp import web
+from deprecated import deprecated
 
 from brewblox_service import brewblox_logger, features, repeater, strex
 
@@ -231,6 +233,7 @@ class EventListener(repeater.RepeaterFeature):
             protocol and await protocol.close()
             transport and transport.close()
 
+    @deprecated(version='0.27.0', reason='Replaced by the mqtt.py module')
     def subscribe(self,
                   exchange_name: str,
                   routing: str,
@@ -356,6 +359,7 @@ class EventPublisher(features.ServiceFeature):
     async def shutdown(self, app: web.Application):
         await self._close()
 
+    @deprecated(version='0.27.0', reason='Replaced by the mqtt.py module')
     async def publish(self,
                       exchange: str,
                       routing: str,
@@ -565,73 +569,3 @@ async def publish(app: web.Application,
                                      message,
                                      exchange_type,
                                      exchange_declare)
-
-
-##############################################################################
-# REST endpoints
-##############################################################################
-
-@routes.post('/_debug/publish')
-async def post_publish(request):
-    """
-    ---
-    tags:
-    - Events
-    summary: Publish event.
-    description: Publish a new event message to the event bus.
-    operationId: events.publish
-    produces:
-    - text/plain
-    parameters:
-    -
-        in: body
-        name: body
-        description: Event message
-        required: true
-        schema:
-            type: object
-            properties:
-                exchange:
-                    type: string
-                routing:
-                    type: string
-                message:
-                    type: object
-    """
-    args = await request.json()
-    await publish(request.app,
-                  args['exchange'],
-                  args['routing'],
-                  args['message'])
-    return web.Response()
-
-
-@routes.post('/_debug/subscribe')
-async def post_subscribe(request):
-    """
-    ---
-    tags:
-    - Events
-    summary: Subscribe to events.
-    operationId: events.subscribe
-    produces:
-    - text/plain
-    parameters:
-    -
-        in: body
-        name: body
-        description: Event message
-        required: true
-        schema:
-            type: object
-            properties:
-                exchange:
-                    type: string
-                routing:
-                    type: string
-    """
-    args = await request.json()
-    subscribe(request.app,
-              args['exchange'],
-              args['routing'])
-    return web.Response()

@@ -4,7 +4,7 @@ Entry point for standalone brewblox_service.
 This will create the app, and enable events.
 """
 
-from brewblox_service import events, scheduler, service
+from brewblox_service import mqtt, scheduler, service
 
 
 def main():
@@ -13,7 +13,7 @@ def main():
     # Event handling is optional, but requires the scheduler
     # Both should be enabled explicitly by service implementations
     scheduler.setup(app)
-    events.setup(app)
+    mqtt.setup(app)
 
     # Add all default endpoints
     service.furnish(app)
