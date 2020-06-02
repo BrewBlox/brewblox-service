@@ -1,4 +1,6 @@
 """
+DEPRECATED: USE THE MQTT MODULE INSTEAD.
+
 Offers event publishing and subscription for service implementations.
 
 Example use:
@@ -565,73 +567,3 @@ async def publish(app: web.Application,
                                      message,
                                      exchange_type,
                                      exchange_declare)
-
-
-##############################################################################
-# REST endpoints
-##############################################################################
-
-@routes.post('/_debug/publish')
-async def post_publish(request):
-    """
-    ---
-    tags:
-    - Events
-    summary: Publish event.
-    description: Publish a new event message to the event bus.
-    operationId: events.publish
-    produces:
-    - text/plain
-    parameters:
-    -
-        in: body
-        name: body
-        description: Event message
-        required: true
-        schema:
-            type: object
-            properties:
-                exchange:
-                    type: string
-                routing:
-                    type: string
-                message:
-                    type: object
-    """
-    args = await request.json()
-    await publish(request.app,
-                  args['exchange'],
-                  args['routing'],
-                  args['message'])
-    return web.Response()
-
-
-@routes.post('/_debug/subscribe')
-async def post_subscribe(request):
-    """
-    ---
-    tags:
-    - Events
-    summary: Subscribe to events.
-    operationId: events.subscribe
-    produces:
-    - text/plain
-    parameters:
-    -
-        in: body
-        name: body
-        description: Event message
-        required: true
-        schema:
-            type: object
-            properties:
-                exchange:
-                    type: string
-                routing:
-                    type: string
-    """
-    args = await request.json()
-    subscribe(request.app,
-              args['exchange'],
-              args['routing'])
-    return web.Response()

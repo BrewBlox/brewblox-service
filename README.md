@@ -68,7 +68,29 @@ Features must be constructed after the app is created, but before it starts runn
 
 The `add()` and `get()` functions make it easy to centrally declare a feature, and then use it in any function that has a reference to the aiohttp app.
 
+## [mqtt.py](./brewblox_service/mqtt.py)
+
+The replacement for the AMQP-based `events` module.
+
+The major advantages over AMQP is that the protocol is simpler, and supports websocket transport.
+This allows for it to be used outside a Brewblox network.
+
+Messages have a /-separated *topic* and a JSON-serialized body.
+
+To publish data, all you need is the `publish(topic, message)` function.
+
+To listen to incoming messages, you can combine `subscribe(topic)` with one or more calls to `listen(topic, callback)`.
+The subscribe/listen functions allow for + and # wildcards to be used.
+
+For a detailed explanation of how to use MQTT topics, see http://www.steves-internet-guide.com/understanding-mqtt-topics/.
+
+For the Brewblox spec on how and where to publish data, see https://brewblox.netlify.app/dev/reference/event_logging.html.
+
+Includes top-level convenience functions for `publish(topic, message)`, `listen(topic, callback)` and `subscribe(topic)`.
+
 ## [events.py](./brewblox_service/events.py)
+
+**This module is deprecated in favor of mqtt.py**
 
 Both incoming and outgoing communication with the AMQP eventbus is handled here.
 

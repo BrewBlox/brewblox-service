@@ -8,15 +8,15 @@ TESTED = main.__name__
 
 
 def test_main(mocker):
-    create_mock = mocker.patch(TESTED + '.service.create_app')
-    furnish_mock = mocker.patch(TESTED + '.service.furnish')
-    run_mock = mocker.patch(TESTED + '.service.run')
-    events_mock = mocker.patch(TESTED + '.events.setup')
-    app_mock = create_mock.return_value
+    m_create = mocker.patch(TESTED + '.service.create_app')
+    m_furnish = mocker.patch(TESTED + '.service.furnish')
+    m_run = mocker.patch(TESTED + '.service.run')
+    m_mqtt = mocker.patch(TESTED + '.mqtt.setup')
+    m_app = m_create.return_value
 
     main.main()
 
-    create_mock.assert_called_once_with(default_name='_service')
-    furnish_mock.assert_called_once_with(app_mock)
-    run_mock.assert_called_once_with(app_mock)
-    events_mock.assert_called_once_with(app_mock)
+    m_create.assert_called_once_with(default_name='_service')
+    m_furnish.assert_called_once_with(m_app)
+    m_run.assert_called_once_with(m_app)
+    m_mqtt.assert_called_once_with(m_app)
