@@ -140,6 +140,7 @@ class EventHandler(repeater.RepeaterFeature):
         self.client: aiomqtt.Client = None
 
         self._connect_ev: asyncio.Event = None
+        self._disconnect_ev: asyncio.Event = None
         self._subs: List[str] = []
         self._listeners: List[Tuple[str, ListenerCallback_]] = []
 
@@ -165,6 +166,7 @@ class EventHandler(repeater.RepeaterFeature):
 
     async def startup(self, app: web.Application):
         self._connect_ev = asyncio.Event()
+        self._disconnect_ev = asyncio.Event()
         self.client = self.create_client(self.config)
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
@@ -190,8 +192,15 @@ class EventHandler(repeater.RepeaterFeature):
 
         except asyncio.CancelledError:
             with suppress(Exception):
+                # Disconnect and run until the broker acknowledges
                 self.client.disconnect()
-                await self.client.loop()
+                done, pending = await asyncio.wait([
+                    self.client.loop_forever(),
+                    self._disconnect_ev.wait(),
+                    asyncio.sleep(2),
+                ],
+                    return_when=asyncio.FIRST_COMPLETED)
+                asyncio.gather(*pending).cancel()
             raise
 
         except Exception as ex:
@@ -208,11 +217,13 @@ class EventHandler(repeater.RepeaterFeature):
             self.client.subscribe(topic)
 
         LOGGER.info(f'{self} connected')
+        self._disconnect_ev.clear()
         self._connect_ev.set()
 
     def _on_disconnect(self, client, userdata, rc):
         LOGGER.info(f'{self} disconnected')
         self._connect_ev.clear()
+        self._disconnect_ev.set()
 
     def _on_message(self, client, userdata, message):
         try:
