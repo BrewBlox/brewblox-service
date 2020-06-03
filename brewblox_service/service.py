@@ -116,7 +116,6 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
                        default='eventbus')
     group.add_argument('--mqtt-port',
                        help='Port at which the eventbus can be reached [%(default)s]',
-                       default=1883,
                        type=int)
     group.add_argument('--mqtt-path',
                        help='Path used for MQTT events. Only applies if a websockets protocol is used. [%(default)s]',
@@ -207,6 +206,7 @@ def furnish(app: web.Application):
                                       contact='development@brewpi.com')
 
     LOGGER.info('Service info: ' + getenv('SERVICE_INFO', 'UNKNOWN'))
+    LOGGER.info('Service config: ' + str(app['config']))
 
     for route in app.router.routes():
         LOGGER.debug(f'Endpoint [{route.method}] {route.resource}')
