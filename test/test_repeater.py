@@ -3,9 +3,9 @@ Tests brewblox_service.repeater
 """
 
 import asyncio
-from unittest.mock import Mock
 
 import pytest
+from mock import Mock
 
 from brewblox_service import features, repeater, scheduler
 
@@ -48,6 +48,10 @@ def app(app):
     prep_cancel.prepare_mock.side_effect = repeater.RepeaterCancelled
     features.add(app, prep_cancel, 'prep_cancel')
 
+    prep_acancel = RepeaterDummy(app)
+    prep_acancel.prepare_mock.side_effect = asyncio.CancelledError
+    features.add(app, prep_acancel, 'prep_acancel')
+
     prep_error = RepeaterDummy(app)
     prep_error.prepare_mock.side_effect = RuntimeError
     features.add(app, prep_error, 'prep_error')
@@ -55,6 +59,10 @@ def app(app):
     run_cancel = RepeaterDummy(app)
     run_cancel.run_mock.side_effect = repeater.RepeaterCancelled
     features.add(app, run_cancel, 'run_cancel')
+
+    run_acancel = RepeaterDummy(app)
+    run_acancel.run_mock.side_effect = asyncio.CancelledError
+    features.add(app, run_acancel, 'run_acancel')
 
     run_error = RepeaterDummy(app)
     run_error.run_mock.side_effect = RuntimeError
@@ -69,8 +77,10 @@ def app(app):
 async def test_dummies(app, client):
     dummy = features.get(app, key='dummy')
     prep_cancel = features.get(app, key='prep_cancel')
+    prep_acancel = features.get(app, key='prep_acancel')
     prep_error = features.get(app, key='prep_error')
     run_cancel = features.get(app, key='run_cancel')
+    run_acancel = features.get(app, key='run_acancel')
     run_error = features.get(app, key='run_error')
     run_resume = features.get(app, key='run_resume')
 
@@ -84,6 +94,10 @@ async def test_dummies(app, client):
     assert prep_cancel.prepare_mock.call_count == 1
     assert prep_cancel.run_mock.call_count == 0
 
+    assert not prep_acancel.active
+    assert prep_acancel.prepare_mock.call_count == 1
+    assert prep_acancel.run_mock.call_count == 0
+
     assert not prep_error.active
     assert prep_error.prepare_mock.call_count == 1
     assert prep_error.run_mock.call_count == 0
@@ -91,6 +105,10 @@ async def test_dummies(app, client):
     assert not run_cancel.active
     assert run_cancel.prepare_mock.call_count == 1
     assert run_cancel.run_mock.call_count == 1
+
+    assert not run_acancel.active
+    assert run_acancel.prepare_mock.call_count == 1
+    assert run_acancel.run_mock.call_count == 1
 
     assert run_error.active
     assert run_error.prepare_mock.call_count == 1

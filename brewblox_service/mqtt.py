@@ -30,9 +30,10 @@ from typing import Awaitable, Callable, List, Tuple, Union
 
 import aiomqtt
 from aiohttp import web
-from async_timeout import timeout
+from aiohttp_apispec import docs, request_schema
+from marshmallow import Schema, fields
 
-from brewblox_service import brewblox_logger, features, repeater, strex
+from brewblox_service import brewblox_logger, features
 
 LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
@@ -81,7 +82,7 @@ class MQTTConfig:
         return f'{self.protocol}://{self.host}:{self.port}{self.path}'
 
 
-class EventHandler(repeater.RepeaterFeature):
+class EventHandler(features.ServiceFeature):
     """
     Connection handler class for MQTT events.
     Handles both TCP and Websocket connections.
@@ -150,7 +151,8 @@ class EventHandler(repeater.RepeaterFeature):
 
     @property
     def connected(self) -> bool:
-        return self._connect_ev is not None \
+        return self.client is not None \
+            and self._connect_ev is not None \
             and self._connect_ev.is_set()
 
     @staticmethod
@@ -171,38 +173,15 @@ class EventHandler(repeater.RepeaterFeature):
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_message
-        await super().startup(app)
 
-    async def prepare(self):
-        """
-        This function is run once, before the run() loop starts.
-        Overrides RepeaterFeature.prepare()
-        """
+        LOGGER.info(f'Starting {self}')
+        self.client.connect_async(self.config.host, self.config.port)
+        self.client.loop_start()
 
-    async def run(self):
-        """
-        This function is repeated until the service exits.
-        It blocks until the client raises an error, and then reconnects.
-        Overrides RepeaterFeature.run()
-        """
-        try:
-            LOGGER.info(f'Starting {self}')
-            await self.client.connect(self.config.host, self.config.port)
-            await self.client.loop_forever()
-
-        except asyncio.CancelledError:
-            with suppress(Exception):
-                # Disconnect and run until the broker acknowledges
-                self.client.disconnect()
-                async with timeout(DISCONNECT_TIMEOUT_S):  # pragma: no cover
-                    while self.connected:
-                        await self.client.loop()
-            raise
-
-        except Exception as ex:
-            LOGGER.error(f'{self}.run() {strex(ex)}')
-            await asyncio.sleep(RETRY_INTERVAL_S)
-            raise ex
+    async def shutdown(self, app: web.Application):
+        if self.client:
+            self.client.disconnect()
+            await self.client.loop_stop()
 
     def _on_connect(self, client, userdata, flags, rc):
         LOGGER.debug(f'Applying subscribe for {self._subs}')
@@ -391,58 +370,36 @@ async def unlisten(app: web.Application, topic: str, callback: ListenerCallback_
     await handler(app).unlisten(topic, callback)
 
 
+class MQTTPublishSchema(Schema):
+    topic = fields.String()
+    message = fields.Dict()
+
+
+class MQTTSubscribeSchema(Schema):
+    topic = fields.String()
+
+
+@docs(
+    tags=['MQTT'],
+    summary='Publish an event message.',
+    description='This is a debugging / diagnostics endpoint.'
+)
 @routes.post('/_debug/publish')
+@request_schema(MQTTPublishSchema())
 async def post_publish(request):
-    """
-    ---
-    tags:
-    - MQTT
-    summary: Publish event.
-    description: Publish a new event message to the event bus.
-    operationId: mqtt.publish
-    produces:
-    - text/plain
-    parameters:
-    -
-        in: body
-        name: body
-        description: Event message
-        required: true
-        schema:
-            type: object
-            properties:
-                topic:
-                    type: string
-                message:
-                    type: object
-    """
-    args = await request.json()
-    await publish(request.app, **args)
+    data = request['data']
+    await publish(request.app, data['topic'], data['message'])
     return web.Response()
 
 
+@docs(
+    tags=['MQTT'],
+    summary='Subscribe to event messages.',
+    description='This is a debugging / diagnostics endpoint. '
+    'Messages received for this subscription will be logged and then discarded.'
+)
 @routes.post('/_debug/subscribe')
+@request_schema(MQTTSubscribeSchema())
 async def post_subscribe(request):
-    """
-    ---
-    tags:
-    - MQTT
-    summary: Subscribe to events.
-    operationId: mqtt.subscribe
-    produces:
-    - text/plain
-    parameters:
-    -
-        in: body
-        name: body
-        description: Event message
-        required: true
-        schema:
-            type: object
-            properties:
-                topic:
-                    type: string
-    """
-    args = await request.json()
-    await subscribe(request.app, args['topic'])
+    await subscribe(request.app, request['data']['topic'])
     return web.Response()

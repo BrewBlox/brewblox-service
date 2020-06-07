@@ -12,10 +12,6 @@ from brewblox_service import brewblox_logger, strex
 LOGGER = brewblox_logger(__name__)
 
 
-def enable_cors(app: web.Application):
-    app.middlewares.append(cors_middleware)
-
-
 def set_cors_headers(request, response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] =\
