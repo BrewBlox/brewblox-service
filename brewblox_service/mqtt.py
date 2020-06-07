@@ -264,11 +264,13 @@ class EventHandler(repeater.RepeaterFeature):
         LOGGER.info(f'unsubscribe({topic})')
         if self.connected:
             self.client.unsubscribe(topic)
-        self._subs.remove(topic)
+        with suppress(ValueError):
+            self._subs.remove(topic)
 
     async def unlisten(self, topic: str, callback: ListenerCallback_):
         LOGGER.info(f'unlisten({topic})')
-        self._listeners.remove((topic, callback))
+        with suppress(ValueError):
+            self._listeners.remove((topic, callback))
 
 
 def setup(app: web.Application):
@@ -364,6 +366,7 @@ async def unsubscribe(app: web.Application, topic: str):
     Requires setup(app) to have been called first.
 
     Removes a subscription that was set by `subscribe(topic)`.
+    Does nothing if no subscription can be found.
 
     Args:
         app (web.Application):
@@ -371,10 +374,6 @@ async def unsubscribe(app: web.Application, topic: str):
 
         topic (str):
             Must match the `topic` argument earlier used in `subscribe(topic)`.
-
-    Raises:
-        ValueError:
-            No matching subscription was found
     """
     await handler(app).unsubscribe(topic)
 
@@ -386,6 +385,7 @@ async def unlisten(app: web.Application, topic: str, callback: ListenerCallback_
 
     Removes a listener that was set by `listen(topic, callback)`.
     Both `topic` and `callback` must match for the listener to be removed.
+    Does nothing if no listener can be found found.
 
     Args:
         app (web.Application):
@@ -396,10 +396,6 @@ async def unlisten(app: web.Application, topic: str, callback: ListenerCallback_
 
         callback (ListenerCallback_):
             Must match the `callback` argument earlier used in `listen(topic, callback)`.
-
-    Raises:
-        ValueError:
-            No matching listener was found
     """
     await handler(app).unlisten(topic, callback)
 

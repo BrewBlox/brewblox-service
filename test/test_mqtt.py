@@ -114,15 +114,13 @@ async def test_listen(app, client, connected):
     # subscribe/unsubscribe on connected client
     await mqtt.subscribe(app, 'pink/#')
     await mqtt.unsubscribe(app, 'pink/#')
-    with pytest.raises(ValueError):
-        await mqtt.unsubscribe(app, 'pink/#')
+    await mqtt.unsubscribe(app, 'pink/#')
 
     # listen/unlisten on connected client
     cb5 = AsyncMock()
     await mqtt.listen(app, 'brewcast/#', cb5)
     await mqtt.unlisten(app, 'brewcast/#', cb5)
-    with pytest.raises(ValueError):
-        await mqtt.unlisten(app, 'brewcast/#', cb5)
+    await mqtt.unlisten(app, 'brewcast/#', cb5)
 
     # must be started manually
     handler = mqtt.EventHandler(app)
