@@ -27,16 +27,14 @@ import argparse
 import logging
 # The argumentparser can't fall back to the default sys.argv if sys is not imported
 import sys  # noqa
-import warnings
 from logging.handlers import TimedRotatingFileHandler
 from os import getenv
-from typing import List, Optional, Set
+from typing import List, Optional
 
-import aiohttp_swagger
 from aiohttp import web
-from aiohttp.web import AbstractResource
+from aiohttp_apispec import docs, setup_aiohttp_apispec, validation_middleware
 
-from brewblox_service import brewblox_logger, cors_middleware, features
+from brewblox_service import brewblox_logger, cors, features
 
 LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
@@ -164,9 +162,22 @@ def create_app(
     args = parser.parse_args(raw_args)
     _init_logging(args)
 
-    LOGGER.info(f'Creating [{args.name}] application')
     app = web.Application()
     app['config'] = vars(args)
+    prefix = '/' + args.name.lstrip('/')
+
+    app.middlewares.append(cors.cors_middleware)
+    app.middlewares.append(validation_middleware)
+
+    setup_aiohttp_apispec(
+        app=app,
+        title=args.name,
+        version='v1',
+        url=f'{prefix}/api/doc/swagger.json',
+        swagger_path=f'{prefix}/api/doc',
+        static_path=f'{prefix}/static/swagger',
+    )
+
     return app
 
 
@@ -181,35 +192,27 @@ def furnish(app: web.Application):
         app (web.Application):
             The Aiohttp Application as created by `create_app()`
     """
-    app_name = app['config']['name']
-    prefix = '/' + app_name.lstrip('/')
+    config = app['config']
+    name = config['name']
+    prefix = '/' + name.lstrip('/')
+
+    prefixed_paths = [
+        f'{prefix}/api/doc/swagger.json',
+        f'{prefix}/api/doc',
+        f'{prefix}/static/swagger',
+    ]
+
     app.router.add_routes(routes)
-    cors_middleware.enable_cors(app)
+    for resource in app.router.resources():
+        if resource.canonical not in prefixed_paths:
+            resource.add_prefix(prefix)
 
-    # Configure CORS and prefixes on all endpoints.
-    known_resources: Set[AbstractResource] = set()
-    for route in list(app.router.routes()):
-        if route.resource is None or route.resource in known_resources:
-            continue
-        known_resources.add(route.resource)
-        route.resource.add_prefix(prefix)
-
-    # Configure swagger settings
-    # We set prefix explicitly here
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        aiohttp_swagger.setup_swagger(app,
-                                      swagger_url=prefix + '/api/doc',
-                                      description='',
-                                      title=f'Brewblox Service "{app_name}"',
-                                      api_version='0.0',
-                                      contact='development@brewpi.com')
-
-    LOGGER.info('Service info: ' + getenv('SERVICE_INFO', 'UNKNOWN'))
-    LOGGER.info('Service config: ' + str(app['config']))
+    LOGGER.info(f'Service name: {name}')
+    LOGGER.info(f'Service info: {getenv("SERVICE_INFO")}')
+    LOGGER.info(f'Service config: {config}')
 
     for route in app.router.routes():
-        LOGGER.debug(f'Endpoint [{route.method}] {route.resource}')
+        LOGGER.debug(f'Endpoint [{route.method}] {route.resource.canonical}')
 
     for name, impl in app.get(features.FEATURES_KEY, {}).items():
         LOGGER.debug(f'Feature [{name}] {impl}')
@@ -231,19 +234,10 @@ def run(app: web.Application):
     web.run_app(app, host=host, port=port)
 
 
+@docs(
+    tags=['Service'],
+    summary='Service health check',
+)
 @routes.get('/_service/status')
 async def healthcheck(request: web.Request) -> web.Response:
-    """
-    ---
-    tags:
-    - Service
-    summary: health check
-    description: Returns service health.
-    operationId: _service.status
-    produces:
-    - application/json
-    responses:
-    "200":
-        description: successful operation
-    """
     return web.json_response({'status': 'ok'})

@@ -87,20 +87,3 @@ For a detailed explanation of how to use MQTT topics, see http://www.steves-inte
 For the Brewblox spec on how and where to publish data, see https://brewblox.netlify.app/dev/reference/event_logging.html.
 
 Includes top-level convenience functions for `publish(topic, message)`, `listen(topic, callback)` and `subscribe(topic)`.
-
-## [events.py](./brewblox_service/events.py)
-
-**This module is deprecated in favor of mqtt.py**
-
-Both incoming and outgoing communication with the AMQP eventbus is handled here.
-
-`EventListener` allows subscribing to eventbus messages. It will fire a callback when one is received. Subscriptions can be set at any time (also before the app starts running).
-
-The listener is designed to gracefully degrade when the eventbus can't be reached. No errors will be raised, and it will periodically attempt to reconnect and restore its subscriptions.
-
-For a practical implementation of `EventListener`, see [brewblox_history](https://github.com/BrewBlox/brewblox-history/blob/develop/brewblox_history/influx.py)
-
-`EventPublisher` is responsible for sending new messages to the eventbus. A single publisher per application is sufficient.
-
-In contrast with `EventListener`, the publisher will raise an exception when attempting to publish to an unreachable eventbus host.
-It will attempt to reconnect for each subsequent message - no explicit connection management is required.

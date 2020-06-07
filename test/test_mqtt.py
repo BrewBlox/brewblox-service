@@ -84,13 +84,9 @@ async def test_create_client(app, client, mocker):
 async def test_invalid(app, client, mocker, find_free_port):
     mocker.patch(TESTED + '.RETRY_INTERVAL_S', 0.001)
     handler = mqtt.EventHandler(app, port=find_free_port())
-    await handler.startup(app)
-    await asyncio.sleep(0.1)
-    assert handler.active
     await handler.shutdown(app)
-
-    with pytest.raises(ConnectionRefusedError):
-        await handler.run()
+    await handler.startup(app)
+    await handler.shutdown(app)
 
     with pytest.raises(ConnectionError):
         await handler.publish('test', {})
