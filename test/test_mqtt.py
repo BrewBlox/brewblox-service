@@ -45,6 +45,13 @@ async def connected(app, client, broker):
     await asyncio.wait_for(mqtt.handler(app)._connect_ev.wait(), timeout=2)
 
 
+@pytest.fixture
+async def manual_handler(app, client):
+    handler = mqtt.EventHandler(app)
+    yield handler
+    await handler.shutdown(app)
+
+
 def test_config():
     cfg = mqtt.MQTTConfig('ws', 'eventbus', None, '/path')
     assert str(cfg) == 'ws://eventbus:80/path'
@@ -96,7 +103,7 @@ async def test_publish(app, client, connected):
     await mqtt.publish(app, 'brewcast/state/test', {'testing': 123})
 
 
-async def test_listen(app, client, connected):
+async def test_listen(app, client, connected, manual_handler):
     # Set listeners with varying wildcards
     cb1 = AsyncMock()
     await mqtt.listen(app, 'brewcast/#', cb1)
@@ -122,34 +129,31 @@ async def test_listen(app, client, connected):
     await mqtt.unlisten(app, 'brewcast/#', cb5)
     await mqtt.unlisten(app, 'brewcast/#', cb5)
 
-    # must be started manually
-    handler = mqtt.EventHandler(app)
-
     # subscribe before connect, and before listen
-    await handler.subscribe('#')
+    await manual_handler.subscribe('#')
 
     # listen before connect
     cbh1 = AsyncMock()
-    await handler.listen('brewcast/#', cbh1)
+    await manual_handler.listen('brewcast/#', cbh1)
 
     # listen/unlisten before connect
     cbh2 = AsyncMock()
-    await handler.listen('pink/#', cbh2)
-    await handler.unlisten('pink/#', cbh2)
+    await manual_handler.listen('pink/#', cbh2)
+    await manual_handler.unlisten('pink/#', cbh2)
 
     # subscribe/unsubscribe before connect
-    await handler.subscribe('pink/#')
-    await handler.unsubscribe('pink/#')
+    await manual_handler.subscribe('pink/#')
+    await manual_handler.unsubscribe('pink/#')
 
     # Start manually controlled handler
     # The default one is already connected (see: 'connected' fixture)
-    await handler.startup(app)
-    await asyncio.wait_for(handler._connect_ev.wait(), timeout=2)
+    await manual_handler.startup(app)
+    await asyncio.wait_for(manual_handler._connect_ev.wait(), timeout=2)
 
     # Publish a set of messages, with varying topics
     await mqtt.publish(app, 'pink/flamingos', {})
     await mqtt.publish(app, 'brewcast/state/test', {})
-    await handler.publish('brewcast/other', {'meaning_of_life': True})
+    await manual_handler.publish('brewcast/other', {'meaning_of_life': True})
     await response(client.post('/_debug/publish',
                                json={
                                    'topic': 'brewcast/state/other',
