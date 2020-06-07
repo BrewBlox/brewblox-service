@@ -30,6 +30,7 @@ from typing import Awaitable, Callable, List, Tuple, Union
 
 import aiomqtt
 from aiohttp import web
+from async_timeout import timeout
 
 from brewblox_service import brewblox_logger, features, repeater, strex
 
@@ -39,6 +40,7 @@ routes = web.RouteTableDef()
 ListenerCallback_ = Callable[[str, Union[dict, list]], Awaitable[None]]
 
 RETRY_INTERVAL_S = 5
+DISCONNECT_TIMEOUT_S = 5
 DEFAULT_PORTS = {
     'mqtt': 1883,
     'mqtts': 8883,
@@ -140,7 +142,6 @@ class EventHandler(repeater.RepeaterFeature):
         self.client: aiomqtt.Client = None
 
         self._connect_ev: asyncio.Event = None
-        self._disconnect_ev: asyncio.Event = None
         self._subs: List[str] = []
         self._listeners: List[Tuple[str, ListenerCallback_]] = []
 
@@ -166,7 +167,6 @@ class EventHandler(repeater.RepeaterFeature):
 
     async def startup(self, app: web.Application):
         self._connect_ev = asyncio.Event()
-        self._disconnect_ev = asyncio.Event()
         self.client = self.create_client(self.config)
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
@@ -194,13 +194,9 @@ class EventHandler(repeater.RepeaterFeature):
             with suppress(Exception):
                 # Disconnect and run until the broker acknowledges
                 self.client.disconnect()
-                done, pending = await asyncio.wait([
-                    self.client.loop_forever(),
-                    self._disconnect_ev.wait(),
-                    asyncio.sleep(2),
-                ],
-                    return_when=asyncio.FIRST_COMPLETED)
-                asyncio.gather(*pending).cancel()
+                async with timeout(DISCONNECT_TIMEOUT_S):  # pragma: no cover
+                    while self.connected:
+                        await self.client.loop()
             raise
 
         except Exception as ex:
@@ -208,22 +204,17 @@ class EventHandler(repeater.RepeaterFeature):
             await asyncio.sleep(RETRY_INTERVAL_S)
             raise ex
 
-        finally:
-            await self.client.loop_stop()
-
     def _on_connect(self, client, userdata, flags, rc):
         LOGGER.debug(f'Applying subscribe for {self._subs}')
         for topic in self._subs:
             self.client.subscribe(topic)
 
         LOGGER.info(f'{self} connected')
-        self._disconnect_ev.clear()
         self._connect_ev.set()
 
     def _on_disconnect(self, client, userdata, rc):
         LOGGER.info(f'{self} disconnected')
         self._connect_ev.clear()
-        self._disconnect_ev.set()
 
     def _on_message(self, client, userdata, message):
         try:
@@ -264,11 +255,13 @@ class EventHandler(repeater.RepeaterFeature):
         LOGGER.info(f'unsubscribe({topic})')
         if self.connected:
             self.client.unsubscribe(topic)
-        self._subs.remove(topic)
+        with suppress(ValueError):
+            self._subs.remove(topic)
 
     async def unlisten(self, topic: str, callback: ListenerCallback_):
         LOGGER.info(f'unlisten({topic})')
-        self._listeners.remove((topic, callback))
+        with suppress(ValueError):
+            self._listeners.remove((topic, callback))
 
 
 def setup(app: web.Application):
@@ -364,6 +357,7 @@ async def unsubscribe(app: web.Application, topic: str):
     Requires setup(app) to have been called first.
 
     Removes a subscription that was set by `subscribe(topic)`.
+    Does nothing if no subscription can be found.
 
     Args:
         app (web.Application):
@@ -371,10 +365,6 @@ async def unsubscribe(app: web.Application, topic: str):
 
         topic (str):
             Must match the `topic` argument earlier used in `subscribe(topic)`.
-
-    Raises:
-        ValueError:
-            No matching subscription was found
     """
     await handler(app).unsubscribe(topic)
 
@@ -386,6 +376,7 @@ async def unlisten(app: web.Application, topic: str, callback: ListenerCallback_
 
     Removes a listener that was set by `listen(topic, callback)`.
     Both `topic` and `callback` must match for the listener to be removed.
+    Does nothing if no listener can be found found.
 
     Args:
         app (web.Application):
@@ -396,10 +387,6 @@ async def unlisten(app: web.Application, topic: str, callback: ListenerCallback_
 
         callback (ListenerCallback_):
             Must match the `callback` argument earlier used in `listen(topic, callback)`.
-
-    Raises:
-        ValueError:
-            No matching listener was found
     """
     await handler(app).unlisten(topic, callback)
 

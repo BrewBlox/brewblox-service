@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "brewblox-service"
-version = "0.27.1"
+version = "0.27.2"
 description = "Scaffolding for Brewblox backend services"
 authors = ["BrewPi <development@brewpi.com>"]
 license = "GPL-3.0"
@@ -15,6 +15,7 @@ aioamqp = "^0.14.0"
 pyyaml = "^5.3.1"
 aiomqtt = "^0.1.1"
 deprecated = "^1.2.10"
+async-timeout = "^3.0.1"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.7.9"
