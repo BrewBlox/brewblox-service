@@ -149,6 +149,7 @@ async def test_listen(app, client, connected, manual_handler):
     # Publish a set of messages, with varying topics
     await mqtt.publish(app, 'pink/flamingos', {})
     await mqtt.publish(app, 'brewcast/state/test', {})
+    await mqtt.publish(app, 'brewcast/empty', None)
     await manual_handler.publish('brewcast/other', {'meaning_of_life': True})
     await response(client.post('/_debug/publish',
                                json={
@@ -156,12 +157,15 @@ async def test_listen(app, client, connected, manual_handler):
                                    'message': {},
                                }))
 
-    await asyncio.sleep(1)
+    manual_handler.client.publish('brewcast/invalid', '{')
+
+    await asyncio.sleep(3)
 
     cb1.assert_has_awaits([
         call('brewcast/state/test', {}),
         call('brewcast/other', {'meaning_of_life': True}),
         call('brewcast/state/other', {}),
+        call('brewcast/empty', None)
     ], any_order=True)
 
     cb2.assert_has_awaits([
