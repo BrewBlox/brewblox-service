@@ -26,19 +26,20 @@ import json
 from contextlib import suppress
 from dataclasses import dataclass, field
 from ssl import CERT_NONE
-from typing import Awaitable, Callable, List, Tuple, Union
+from typing import Awaitable, Callable, List, Optional, Tuple, Union
 
 import aiomqtt
 from aiohttp import web
 from aiohttp_apispec import docs, request_schema
 from marshmallow import Schema, fields
 
-from brewblox_service import brewblox_logger, features
+from brewblox_service import brewblox_logger, features, strex
 
 LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
 
-ListenerCallback_ = Callable[[str, Union[dict, list]], Awaitable[None]]
+EventData_ = Optional[Union[dict, list]]
+ListenerCallback_ = Callable[[str, EventData_], Awaitable[None]]
 
 RETRY_INTERVAL_S = 5
 DISCONNECT_TIMEOUT_S = 5
@@ -195,6 +196,12 @@ class EventHandler(features.ServiceFeature):
         LOGGER.info(f'{self} disconnected')
         self._connect_ev.clear()
 
+    async def _handle_callback(self, cb, topic, payload):
+        try:
+            await cb(topic, json.loads(payload) if payload else None)
+        except Exception as ex:
+            LOGGER.error(f'Exception handling MQTT callback for {topic}: {strex(ex)}')
+
     def _on_message(self, client, userdata, message):
         try:
             topic = decoded(message.topic)
@@ -208,13 +215,14 @@ class EventHandler(features.ServiceFeature):
                     if aiomqtt.topic_matches_sub(sub, topic)]
 
         for cb in matching:
-            asyncio.create_task(cb(topic, json.loads(payload)))
+            asyncio.create_task(self._handle_callback(cb, topic, payload))
 
         if not matching:
             LOGGER.info(f'{self} recv topic={topic}, msg={payload[:30]}...')
 
-    async def publish(self, topic: str, message: dict, err=True, **kwargs):
-        info = self.client.publish(topic, json.dumps(message), **kwargs)
+    async def publish(self, topic: str, message: EventData_, err=True, **kwargs):
+        payload = json.dumps(message) if message is not None else None
+        info = self.client.publish(topic, payload, **kwargs)
         error = aiomqtt.error_string(info.rc)
         LOGGER.debug(f'publish({topic}) -> {error}')
         if info.rc != 0 and err:
