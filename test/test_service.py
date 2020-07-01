@@ -9,7 +9,7 @@ import pytest
 from aiohttp import web_exceptions
 from aiohttp.client_exceptions import ServerDisconnectedError
 
-from brewblox_service import features, service
+from brewblox_service import features, service, testing
 
 TESTED = service.__name__
 
@@ -162,5 +162,10 @@ async def test_error_cors(app, client, mocker):
 
 def test_run(app, mocker):
     run_mock = mocker.patch(TESTED + '.web.run_app')
+
     service.run(app)
-    run_mock.assert_called_once_with(app, host='0.0.0.0', port=1234)
+    run_mock.assert_called_with(app, host='0.0.0.0', port=1234)
+
+    app['config']['bind_http_server'] = False
+    service.run(app)
+    run_mock.assert_called_with(app, path=testing.matching(r'/tmp/.+/dummy.sock'))

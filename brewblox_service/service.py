@@ -27,6 +27,8 @@ import argparse
 import logging
 # The argumentparser can't fall back to the default sys.argv if sys is not imported
 import sys  # noqa
+import tempfile
+from distutils.util import strtobool
 from logging.handlers import TimedRotatingFileHandler
 from os import getenv
 from typing import List, Optional
@@ -80,31 +82,37 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
         argparse.ArgumentParser: a Python ArgumentParser with defaults set.
 
     """
-    argparser = argparse.ArgumentParser(fromfile_prefix_chars='@')
-    argparser.add_argument('-H', '--host',
-                           help='Host to which the app binds. [%(default)s]',
-                           default='0.0.0.0')
-    argparser.add_argument('-p', '--port',
-                           help='Port to which the app binds. [%(default)s]',
-                           default=5000,
-                           type=int)
-    argparser.add_argument('-o', '--output',
-                           help='Logging output. [%(default)s]')
-    argparser.add_argument('-n', '--name',
-                           help='Service name. This will be used as prefix for all endpoints. [%(default)s]',
-                           default=default_name)
-    argparser.add_argument('--debug',
-                           help='Run the app in debug mode. [%(default)s]',
-                           action='store_true')
-    argparser.add_argument('--eventbus-host',
-                           help='[Deprecated] Hostname at which the AMQP eventbus can be reached [%(default)s]',
-                           default='eventbus')
-    argparser.add_argument('--eventbus-port',
-                           help='[Deprecated] Port at which the AMQP eventbus can be reached [%(default)s]',
-                           default=5672,
-                           type=int)
+    parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
+    parser.add_argument('-H', '--host',
+                        help='Host to which the app binds. [%(default)s]',
+                        default='0.0.0.0')
+    parser.add_argument('-p', '--port',
+                        help='Port to which the app binds. [%(default)s]',
+                        default=5000,
+                        type=int)
+    parser.add_argument('--bind-http-server',
+                        help=('Enable or disable all endpoints. '
+                              'Set to false for host-mode services without meaningful endpoints. [%(default)s]'),
+                        default=True,
+                        metavar='true|false',
+                        type=lambda v: bool(strtobool(v.lower())))
+    parser.add_argument('-o', '--output',
+                        help='Logging output. [%(default)s]')
+    parser.add_argument('-n', '--name',
+                        help='Service name. This will be used as prefix for all endpoints. [%(default)s]',
+                        default=default_name)
+    parser.add_argument('--debug',
+                        help='Run the app in debug mode. [%(default)s]',
+                        action='store_true')
+    parser.add_argument('--eventbus-host',
+                        help='[Deprecated] Hostname at which the AMQP eventbus can be reached [%(default)s]',
+                        default='eventbus')
+    parser.add_argument('--eventbus-port',
+                        help='[Deprecated] Port at which the AMQP eventbus can be reached [%(default)s]',
+                        default=5672,
+                        type=int)
 
-    group = argparser.add_argument_group('MQTT Event handling')
+    group = parser.add_argument_group('MQTT Event handling')
     group.add_argument('--mqtt-protocol',
                        help='Transport protocol used for MQTT events. [%(default)s]',
                        choices=['mqtt', 'mqtts', 'ws', 'wss'],
@@ -124,7 +132,7 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
     group.add_argument('--state-topic',
                        help='Eventbus topic to which volatile controller state is broadcast. [%(default)s]',
                        default='brewcast/state')
-    return argparser
+    return parser
 
 
 def create_app(
@@ -227,11 +235,16 @@ def run(app: web.Application):
         app (web.Application):
             The Aiohttp Application as created by `create_app()`
     """
-    host = app['config']['host']
-    port = app['config']['port']
+    config = app['config']
 
-    # starts app. run_app() will automatically start the async context.
-    web.run_app(app, host=host, port=port)
+    if config['bind_http_server']:
+        web.run_app(app, host=config['host'], port=config['port'])
+    else:
+        # Listen to a dummy UNIX socket
+        # The service still runs, but is not bound to any port
+        # This is useful for services without a meaningful REST API
+        with tempfile.TemporaryDirectory() as tmpdir:
+            web.run_app(app, path=f'{tmpdir}/dummy.sock')
 
 
 @docs(
