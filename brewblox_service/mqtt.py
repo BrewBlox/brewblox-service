@@ -41,7 +41,6 @@ routes = web.RouteTableDef()
 EventData_ = Optional[Union[dict, list]]
 ListenerCallback_ = Callable[[str, EventData_], Awaitable[None]]
 
-DISCONNECT_TIMEOUT_S = 5
 DEFAULT_PORTS = {
     'mqtt': 1883,
     'mqtts': 8883,
