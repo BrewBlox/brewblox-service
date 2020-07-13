@@ -168,7 +168,7 @@ class EventHandler(features.ServiceFeature):
     @staticmethod
     def create_client(config: MQTTConfig) -> aiomqtt.Client:
         client = aiomqtt.Client(transport=config.transport,
-                                protocol=aiomqtt.MQTTv5)
+                                protocol=aiomqtt.MQTTv311)
         client.ws_set_options(path=config.path)
 
         if config.protocol in ['mqtts', 'wss']:
