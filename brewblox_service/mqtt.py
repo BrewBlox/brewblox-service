@@ -41,7 +41,6 @@ routes = web.RouteTableDef()
 EventData_ = Optional[Union[dict, list]]
 ListenerCallback_ = Callable[[str, EventData_], Awaitable[None]]
 
-RETRY_INTERVAL_S = 5
 DISCONNECT_TIMEOUT_S = 5
 DEFAULT_PORTS = {
     'mqtt': 1883,
@@ -64,6 +63,7 @@ class MQTTConfig:
     port: int
     path: str
     transport: str = field(init=False)
+    client_will: dict = field(init=False)
 
     def __post_init__(self):
         if self.protocol not in ['ws', 'wss', 'mqtt', 'mqtts']:
@@ -78,6 +78,8 @@ class MQTTConfig:
 
         if not self.port or self.port == 5672:
             self.port = DEFAULT_PORTS[self.protocol]
+
+        self.client_will = {}
 
     def __str__(self):
         return f'{self.protocol}://{self.host}:{self.port}{self.path}'
@@ -156,15 +158,26 @@ class EventHandler(features.ServiceFeature):
             and self._connect_ev is not None \
             and self._connect_ev.is_set()
 
+    def set_client_will(self, topic: str, message: EventData_, **kwargs):
+        if self.client:
+            raise RuntimeError('Client will must be set before startup')
+        payload = json.dumps(message) if message is not None else None
+        self.config.client_will = dict(topic=topic,
+                                       payload=payload,
+                                       **kwargs)
+
     @staticmethod
     def create_client(config: MQTTConfig) -> aiomqtt.Client:
         client = aiomqtt.Client(transport=config.transport,
-                                protocol=aiomqtt.MQTTv311)
+                                protocol=aiomqtt.MQTTv5)
         client.ws_set_options(path=config.path)
 
         if config.protocol in ['mqtts', 'wss']:
             client.tls_set(cert_reqs=CERT_NONE)
             client.tls_insecure_set(True)
+
+        if config.client_will:
+            client.will_set(**config.client_will)
 
         return client
 
@@ -183,8 +196,9 @@ class EventHandler(features.ServiceFeature):
         if self.client:
             self.client.disconnect()
             await self.client.loop_stop()
+            self.client = None
 
-    def _on_connect(self, client, userdata, flags, rc):
+    def _on_connect(self, *args):
         LOGGER.debug(f'Applying subscribe for {self._subs}')
         for topic in self._subs:
             self.client.subscribe(topic)
@@ -192,7 +206,7 @@ class EventHandler(features.ServiceFeature):
         LOGGER.info(f'{self} connected')
         self._connect_ev.set()
 
-    def _on_disconnect(self, client, userdata, rc):
+    def _on_disconnect(self, *args):
         LOGGER.info(f'{self} disconnected')
         self._connect_ev.clear()
 
@@ -202,7 +216,7 @@ class EventHandler(features.ServiceFeature):
         except Exception as ex:
             LOGGER.error(f'Exception handling MQTT callback for {topic}: {strex(ex)}')
 
-    def _on_message(self, client, userdata, message):
+    def _on_message(self, client, userdata, message, *args):
         try:
             topic = decoded(message.topic)
             payload = decoded(message.payload)
@@ -275,7 +289,32 @@ def handler(app: web.Application) -> EventHandler:
     return features.get(app, EventHandler)
 
 
-async def publish(app: web.Application, topic: str, message: dict, **kwargs):
+def set_client_will(app: web.Application,
+                    topic: str,
+                    message: EventData_ = None,
+                    **kwargs):
+    """
+    Set MQTT Last Will and Testament for client.
+    Requires setup(app) to have been called first.
+    Must be called before startup.
+
+    Args:
+        app (web.Application):
+            The Aiohttp Application object.
+
+        topic (str):
+            The MQTT message topic. Cannot include wildcards.
+
+        message (dict, None):
+            A JSON-serializable object, or None.
+    """
+    handler(app).set_client_will(topic, message, **kwargs)
+
+
+async def publish(app: web.Application,
+                  topic: str,
+                  message: EventData_,
+                  **kwargs):
     """
     Publish a new event message.
 

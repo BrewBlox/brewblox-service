@@ -29,13 +29,13 @@ def broker(find_free_port):
 
 @pytest.fixture
 def app(app, mocker, broker):
-    mocker.patch(TESTED + '.RETRY_INTERVAL_S', 0.1)
     app['config']['mqtt_host'] = 'localhost'
     app['config']['mqtt_protocol'] = 'mqtt'
     app['config']['mqtt_port'] = broker['mqtt']
 
     scheduler.setup(app)
     mqtt.setup(app)
+    mqtt.set_client_will(app, 'brewcast/rip', None)
 
     return app
 
@@ -76,17 +76,23 @@ async def test_broker(broker):
 async def test_create_client(app, client, mocker):
     m_client = mocker.patch(TESTED + '.aiomqtt.Client')
     cfg = mqtt.MQTTConfig('mqtts', 'localhost', None, '/wunderbar')
+
+    assert not cfg.client_will
+    cfg.client_will = {'topic': 'brewcast/test'}
+
     c = mqtt.EventHandler.create_client(cfg)
     assert c is m_client.return_value
     c.tls_set.assert_called_once()
+    c.will_set.assert_called_once()
 
 
 async def test_invalid(app, client, mocker, find_free_port):
-    mocker.patch(TESTED + '.RETRY_INTERVAL_S', 0.001)
     handler = mqtt.EventHandler(app, port=find_free_port())
     await handler.shutdown(app)
     await handler.startup(app)
-    await handler.shutdown(app)
+
+    with pytest.raises(RuntimeError):
+        handler.set_client_will('brewcast/nope', None)
 
     with pytest.raises(ConnectionError):
         await handler.publish('test', {})
