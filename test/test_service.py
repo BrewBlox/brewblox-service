@@ -72,8 +72,6 @@ def test_init_logging(mocker):
     assert log_mock.getLogger().addHandler.call_count == 0
 
     log_mock.getLogger.assert_has_calls([
-        call('aioamqp'),
-        call().setLevel(log_mock.WARN),
         call('asyncio'),
         call().setLevel(log_mock.WARN),
         call('aiohttp.access'),

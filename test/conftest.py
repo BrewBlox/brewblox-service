@@ -28,14 +28,15 @@ def app_config() -> dict:
         'bind_http_server': True,
         'debug': False,
         'output': None,
-        'eventbus_host': 'eventbus',
-        'eventbus_port': 5672,
         'mqtt_protocol': 'mqtt',
         'mqtt_host': 'eventbus',
         'mqtt_port': 1883,
         'mqtt_path': '/eventbus',
         'history_topic': '/brewcast/history',
         'state_topic': '/brewcast/state',
+        # Suppressed
+        'eventbus_host': None,
+        'eventbus_port': None,
     }
 
 
@@ -47,8 +48,6 @@ def sys_args(app_config) -> list:
         '--host', app_config['host'],
         '--port', app_config['port'],
         '--bind-http-server', app_config['bind_http_server'],
-        '--eventbus-host', app_config['eventbus_host'],
-        '--eventbus-port', app_config['eventbus_port'],
         '--mqtt-protocol', app_config['mqtt_protocol'],
         '--mqtt-host', app_config['mqtt_host'],
         '--mqtt-port', app_config['mqtt_port'],

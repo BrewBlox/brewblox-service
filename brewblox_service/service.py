@@ -62,7 +62,6 @@ def _init_logging(args: argparse.Namespace):
         logging.getLogger().addHandler(handler)
 
     if not args.debug:
-        logging.getLogger('aioamqp').setLevel(logging.WARN)
         logging.getLogger('asyncio').setLevel(logging.WARN)
         logging.getLogger('aiohttp.access').setLevel(logging.WARN)
 
@@ -104,13 +103,10 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
     parser.add_argument('--debug',
                         help='Run the app in debug mode. [%(default)s]',
                         action='store_true')
-    parser.add_argument('--eventbus-host',
-                        help='[Deprecated] Hostname at which the AMQP eventbus can be reached [%(default)s]',
-                        default='eventbus')
-    parser.add_argument('--eventbus-port',
-                        help='[Deprecated] Port at which the AMQP eventbus can be reached [%(default)s]',
-                        default=5672,
-                        type=int)
+
+    # Deprecated and silently ignored
+    parser.add_argument('--eventbus-host', help=argparse.SUPPRESS)
+    parser.add_argument('--eventbus-port', help=argparse.SUPPRESS)
 
     group = parser.add_argument_group('MQTT Event handling')
     group.add_argument('--mqtt-protocol',
