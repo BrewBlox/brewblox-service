@@ -28,8 +28,6 @@ import logging
 # The argumentparser can't fall back to the default sys.argv if sys is not imported
 import sys  # noqa
 import tempfile
-from distutils.util import strtobool
-from logging.handlers import TimedRotatingFileHandler
 from os import getenv
 from typing import List, Optional
 
@@ -48,21 +46,9 @@ def _init_logging(args: argparse.Namespace):
     datefmt = '%Y/%m/%d %H:%M:%S'
 
     logging.basicConfig(level=level, format=format, datefmt=datefmt)
-
-    if args.output:
-        handler = TimedRotatingFileHandler(
-            args.output,
-            when='d',
-            interval=1,
-            backupCount=7,
-            encoding='utf-8'
-        )
-        handler.setFormatter(logging.Formatter(format, datefmt))
-        handler.setLevel(level)
-        logging.getLogger().addHandler(handler)
+    logging.captureWarnings(True)
 
     if not args.debug:
-        logging.getLogger('asyncio').setLevel(logging.WARN)
         logging.getLogger('aiohttp.access').setLevel(logging.WARN)
 
 
@@ -89,24 +75,12 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
                         help='Port to which the app binds. [%(default)s]',
                         default=5000,
                         type=int)
-    parser.add_argument('--bind-http-server',
-                        help=('Enable or disable all endpoints. '
-                              'Set to false for host-mode services without meaningful endpoints. [%(default)s]'),
-                        default=True,
-                        metavar='true|false',
-                        type=lambda v: bool(strtobool(v.lower())))
-    parser.add_argument('-o', '--output',
-                        help='Logging output. [%(default)s]')
     parser.add_argument('-n', '--name',
                         help='Service name. This will be used as prefix for all endpoints. [%(default)s]',
                         default=default_name)
     parser.add_argument('--debug',
                         help='Run the app in debug mode. [%(default)s]',
                         action='store_true')
-
-    # Deprecated and silently ignored
-    parser.add_argument('--eventbus-host', help=argparse.SUPPRESS)
-    parser.add_argument('--eventbus-port', help=argparse.SUPPRESS)
 
     group = parser.add_argument_group('MQTT Event handling')
     group.add_argument('--mqtt-protocol',
@@ -163,8 +137,11 @@ def create_app(
         assert default_name, 'Default service name is required'
         parser = create_parser(default_name)
 
-    args = parser.parse_args(raw_args)
+    args, unknown_args = parser.parse_known_args(raw_args)
     _init_logging(args)
+
+    if unknown_args:
+        LOGGER.error(f'Unknown arguments detected: {unknown_args}')
 
     app = web.Application()
     app['config'] = vars(args)
@@ -222,7 +199,7 @@ def furnish(app: web.Application):
         LOGGER.debug(f'Feature [{name}] {impl}')
 
 
-def run(app: web.Application):
+def run(app: web.Application, listen_http: bool = True):
     """
     Runs the application in an async context.
     This function will block indefinitely until the application is shut down.
@@ -230,10 +207,16 @@ def run(app: web.Application):
     Args:
         app (web.Application):
             The Aiohttp Application as created by `create_app()`
+
+        listen_http (bool):
+            Whether to open a port for the REST API.
+            Set to False to disable all REST endpoints.
+            This can be useful for services that use communication protocols
+            other than REST (such as MQTT), or only have active functionality.
     """
     config = app['config']
 
-    if config['bind_http_server']:
+    if listen_http:
         web.run_app(app, host=config['host'], port=config['port'])
     else:
         # Listen to a dummy UNIX socket

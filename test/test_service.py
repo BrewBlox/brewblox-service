@@ -36,17 +36,12 @@ def test_parse_args():
     args = parser.parse_args([])
     assert args.port == 5000
     assert not args.debug
-    assert not args.output
     assert args.host == '0.0.0.0'
     assert args.name == 'brewblox'
 
     # test host
     args = parser.parse_args(['-H', 'host_name'])
     assert args.host == 'host_name'
-
-    # test output file name
-    args = parser.parse_args(['-o', 'file_name'])
-    assert args.output == 'file_name'
 
     # test name
     args = parser.parse_args(['-n', 'service_name'])
@@ -63,26 +58,16 @@ def test_parse_args():
 
 def test_init_logging(mocker):
     log_mock = mocker.patch(TESTED + '.logging')
-    handler = mocker.patch(TESTED + '.TimedRotatingFileHandler').return_value
 
     args = service.create_parser('brewblox').parse_args([])
     service._init_logging(args)
 
     assert log_mock.basicConfig.call_count == 1
-    assert log_mock.getLogger().addHandler.call_count == 0
 
     log_mock.getLogger.assert_has_calls([
-        call('asyncio'),
-        call().setLevel(log_mock.WARN),
         call('aiohttp.access'),
         call().setLevel(log_mock.WARN),
     ])
-
-    args = service.create_parser('brewblox').parse_args(['-o', 'outfile'])
-    service._init_logging(args)
-
-    assert log_mock.basicConfig.call_count == 2
-    log_mock.getLogger().addHandler.assert_called_once_with(handler)
 
 
 def test_no_logging_mute(mocker):
@@ -95,10 +80,13 @@ def test_no_logging_mute(mocker):
 
 
 def test_create_app(sys_args, app_config, mocker):
-    app = service.create_app(default_name='brewblox', raw_args=sys_args[1:])
+    raw_args = sys_args[1:] + ['--unknown', 'really']
+    m_error = mocker.patch(TESTED + '.LOGGER.error')
+    app = service.create_app(default_name='brewblox', raw_args=raw_args)
 
     assert app is not None
     assert app['config'] == app_config
+    m_error.assert_called_once_with(testing.matching(r".*\['--unknown', 'really'\]"))
 
 
 def test_create_no_args(sys_args, app_config, mocker):
@@ -164,6 +152,5 @@ def test_run(app, mocker):
     service.run(app)
     run_mock.assert_called_with(app, host='0.0.0.0', port=1234)
 
-    app['config']['bind_http_server'] = False
-    service.run(app)
+    service.run(app, False)
     run_mock.assert_called_with(app, path=testing.matching(r'/tmp/.+/dummy.sock'))
