@@ -42,7 +42,7 @@ def app(app, mocker, broker):
 
 @pytest.fixture
 async def connected(app, client, broker):
-    await asyncio.wait_for(mqtt.handler(app)._connect_ev.wait(), timeout=2)
+    await asyncio.wait_for(mqtt.handler(app)._connect_ev.wait(), timeout=5)
 
 
 @pytest.fixture
