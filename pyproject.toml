@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "brewblox-service"
-version = "0.32.1"
+version = "0.32.2"
 description = "Scaffolding for Brewblox backend services"
 authors = ["BrewPi <development@brewpi.com>"]
 license = "GPL-3.0"
@@ -8,7 +8,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.7"
-aiohttp = {extras = ["speedups"], version = "^3.6.3"}
+aiohttp = "^3.7.3"
 aiomqtt = "^0.1.1"
 aiohttp-apispec = "^2.2.1"
 
@@ -21,7 +21,6 @@ pytest-aiohttp = "^0.3.0"
 autopep8 = "^1.5"
 aresponses = "^2.0.0"
 pytest = "^5.4.1"
-brewblox-dev = "^1.4.0"
 flake8-quotes = "^2.1.1"
 asyncmock = "^0.4.2"
 
