@@ -20,7 +20,7 @@ def broker(find_free_port):
     check_call('docker run -d --rm '
                '--name mqtt-test-broker '
                f'-p {mqtt_port}:1883 '
-               'brewblox/brewblox-mosquitto:develop',
+               'brewblox/mosquitto:develop',
                shell=True,
                stdout=PIPE)
     yield {'mqtt': mqtt_port}
