@@ -34,7 +34,6 @@ steps:
   displayName: Install
 
 - bash: |
-    docker pull eclipse-mosquitto
     poetry run pytest
   displayName: Test
 
