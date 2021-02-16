@@ -24,6 +24,7 @@ def broker(find_free_port):
                shell=True,
                stdout=PIPE)
     yield {'mqtt': mqtt_port}
+    print(check_output('docker logs -t mqtt-test-broker', shell=True))
     check_call('docker stop mqtt-test-broker', shell=True)
 
 
