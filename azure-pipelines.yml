@@ -1,5 +1,5 @@
 pool:
-  vmImage: 'Ubuntu-18.04'
+  vmImage: 'Ubuntu-20.04'
 
 trigger:
   tags:
@@ -33,7 +33,8 @@ steps:
     poetry build
   displayName: Install
 
-- bash: poetry run pytest
+- bash: |
+    poetry run pytest
   displayName: Test
 
 - bash: |

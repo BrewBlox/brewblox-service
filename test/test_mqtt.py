@@ -20,7 +20,7 @@ def broker(find_free_port):
     check_call('docker run -d --rm '
                '--name mqtt-test-broker '
                f'-p {mqtt_port}:1883 '
-               'eclipse-mosquitto',
+               'brewblox/mosquitto:develop',
                shell=True,
                stdout=PIPE)
     yield {'mqtt': mqtt_port}
@@ -29,7 +29,7 @@ def broker(find_free_port):
 
 @pytest.fixture
 def app(app, mocker, broker):
-    app['config']['mqtt_host'] = 'localhost'
+    app['config']['mqtt_host'] = '0.0.0.0'
     app['config']['mqtt_protocol'] = 'mqtt'
     app['config']['mqtt_port'] = broker['mqtt']
 
@@ -42,7 +42,12 @@ def app(app, mocker, broker):
 
 @pytest.fixture
 async def connected(app, client, broker):
-    await asyncio.wait_for(mqtt.handler(app)._connect_ev.wait(), timeout=2)
+    try:
+        await asyncio.wait_for(mqtt.handler(app)._connect_ev.wait(), timeout=5)
+    except asyncio.TimeoutError:
+        print(check_output('docker ps', shell=True).decode())
+        print(check_output('docker logs -t mqtt-test-broker', shell=True))
+        raise
 
 
 @pytest.fixture
@@ -165,7 +170,15 @@ async def test_listen(app, client, connected, manual_handler):
 
     manual_handler.client.publish('brewcast/invalid', '{')
 
-    await asyncio.sleep(3)
+    delay_count = 0
+    while (cb1.await_count < 4
+            or cb2.await_count < 2
+           or cb3.await_count < 1
+           or cbh1.await_count < 3):
+        delay_count += 1
+        if delay_count >= 10:
+            break
+        await asyncio.sleep(1)
 
     cb1.assert_has_awaits([
         call('brewcast/state/test', {}),
