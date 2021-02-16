@@ -20,11 +20,10 @@ def broker(find_free_port):
     check_call('docker run -d --rm '
                '--name mqtt-test-broker '
                f'-p {mqtt_port}:1883 '
-               'eclipse-mosquitto',
+               'brewblox/brewblox-mosquitto:develop',
                shell=True,
                stdout=PIPE)
     yield {'mqtt': mqtt_port}
-    print(check_output('docker logs -t mqtt-test-broker', shell=True))
     check_call('docker stop mqtt-test-broker', shell=True)
 
 
@@ -47,6 +46,7 @@ async def connected(app, client, broker):
         await asyncio.wait_for(mqtt.handler(app)._connect_ev.wait(), timeout=5)
     except asyncio.TimeoutError:
         print(check_output('docker ps', shell=True).decode())
+        print(check_output('docker logs -t mqtt-test-broker', shell=True))
         raise
 
 
