@@ -78,10 +78,7 @@ class RepeaterFeature(features.ServiceFeature):
         This avoids a gotcha where subclasses have to call `super().startup(app)`
         for RepeaterFeature, but not for ServiceFeature.
         """
-        # User-defined startup
-        await self.startup(app)
-
-        # Repeater-specific startup
+        await super()._startup(app)
         if self._autostart:
             await self.start()
 
@@ -91,11 +88,8 @@ class RepeaterFeature(features.ServiceFeature):
         This avoids a gotcha where subclasses have to call `super().shutdown(app)`
         for RepeaterFeature, but not for ServiceFeature.
         """
-        # Repeater-specific shutdown
         await self.end()
-
-        # User-defined shutdown
-        await self.shutdown(app)
+        await super()._shutdown(app)
 
     async def __repeat(self):
         last_ok = True
