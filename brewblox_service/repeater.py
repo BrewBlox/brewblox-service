@@ -31,7 +31,7 @@ from aiohttp import web
 
 from brewblox_service import brewblox_logger, features, scheduler, strex
 
-LOGGER = brewblox_logger(__name__)
+LOGGER = brewblox_logger(__name__, dedupe=True)
 
 
 class RepeaterCancelled(Exception):
@@ -41,40 +41,73 @@ class RepeaterCancelled(Exception):
 
 
 class RepeaterFeature(features.ServiceFeature):
+    """Base class for Aiohttp handler classes that implement a background task.
 
-    def __init__(self, app: web.Application):
-        super().__init__(app)
+    RepeaterFeature wraps the `prepare()` and `run()` functions in an `asyncio.Task`,
+    and handles the boilerplate code for creation and cleanup.
+
+    `prepare()` is called once after the background task is started.
+    Afterwards, `run()` is called in a loop until the task is stopped.
+
+    The background task is stopped when either:
+    - The service stops, and `shutdown()` is called.
+    - `end()` is called manually.
+    - `prepare()` raises any exception.
+    - `prepare()` or `run()` raise a `RepeaterCancelled` exception.
+
+    The `startup()`, `before_shutdown()`, and `shutdown()` functions
+    are inherited from `ServiceFeature`.
+
+    During typical app lifetime, functions are called in this order:
+    - `startup()`
+    - `prepare()`
+    - `run()` [repeated until shutdown]
+    - `before_shutdown()`
+    - `shutdown()`
+    """
+
+    def __init__(self, app: web.Application, autostart=True, **kwargs):
+        super().__init__(app, **kwargs)
+        self._autostart: bool = autostart
         self._task: Optional[asyncio.Task] = None
+        self._debug: bool = app['config']['debug']
 
-    @property
-    def active(self) -> bool:
+    async def _startup(self, app: web.Application):
         """
-        Indicates whether the background task is currently running: not finished, not cancelled.
+        Overrides the private ServiceFeature startup hook.
+        This avoids a gotcha where subclasses have to call `super().startup(app)`
+        for RepeaterFeature, but not for ServiceFeature.
         """
-        return bool(self._task and not self._task.done())
+        await super()._startup(app)
+        if self._autostart:
+            await self.start()
 
-    async def startup(self, app: web.Application):
-        await self.shutdown(app)
-        await self.start()
-
-    async def shutdown(self, app: web.Application):
+    async def _shutdown(self, app: web.Application):
+        """
+        Overrides the private ServiceFeature shutdown hook.
+        This avoids a gotcha where subclasses have to call `super().shutdown(app)`
+        for RepeaterFeature, but not for ServiceFeature.
+        """
         await self.end()
+        await super()._shutdown(app)
 
     async def __repeat(self):
         last_ok = True
 
         try:
+            LOGGER.debug(f'--> prepare {self}')
             await self.prepare()
+            LOGGER.debug(f'<-- prepare {self}')
 
         except asyncio.CancelledError:
             raise
 
         except RepeaterCancelled:
-            LOGGER.info(f'{self} cancelled during setup.')
+            LOGGER.info(f'{self} cancelled during prepare().')
             return
 
         except Exception as ex:
-            LOGGER.error(f'{self} error during setup: {strex(ex)}')
+            LOGGER.error(f'{self} error during prepare(): {strex(ex)}')
             raise ex
 
         while True:
@@ -89,19 +122,27 @@ class RepeaterFeature(features.ServiceFeature):
                 raise
 
             except RepeaterCancelled:
-                LOGGER.info(f'{self} cancelled during runtime.')
+                LOGGER.info(f'{self} cancelled during run().')
                 return
 
             except Exception as ex:
-                # Only log the first error to prevent log spam
-                if last_ok:
-                    LOGGER.error(f'{self} error during runtime: {strex(ex)}')
-                    last_ok = False
+                # Duplicate log messages are automatically filtered
+                LOGGER.error(f'{self} error during run(): {strex(ex, tb=self._debug)}')
+                last_ok = False
+
+    @property
+    def active(self) -> bool:
+        """
+        Indicates whether the background task is currently running: not finished, not cancelled.
+        """
+        return bool(self._task and not self._task.done())
 
     async def start(self):
         """
-        Initializes the repeater task.
-        By default called during startup(), but implementations can choose to override this.
+        Initializes the background task.
+        By default called during startup, but implementations can disable this by using
+        `autostart=False` in the constructor.
+
         Will cancel the previous task if called repeatedly.
         """
         await self.end()
@@ -109,13 +150,12 @@ class RepeaterFeature(features.ServiceFeature):
 
     async def end(self):
         """
-        Ends the repeater task.
-        Always called during shutdown(), but can be safely called earlier.
+        Ends the background task.
+        Always called during shutdown, but can be safely called earlier.
         """
         await scheduler.cancel(self.app, self._task)
         self._task = None
 
-    @abstractmethod
     async def prepare(self):
         """
         One-time preparation.
@@ -128,5 +168,5 @@ class RepeaterFeature(features.ServiceFeature):
         """
         This function will be called on repeat.
         It is advisable to implement rate limiting through the use of
-        `await asyncio.sleep()`
+        `await asyncio.sleep(interval)`
         """
