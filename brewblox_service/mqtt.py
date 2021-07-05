@@ -233,9 +233,15 @@ class EventHandler(features.ServiceFeature):
         if not matching:
             LOGGER.info(f'{self} recv topic={topic}, msg={payload[:30]}...')
 
-    async def publish(self, topic: str, message: EventData_, err=True, **kwargs):
+    async def publish(self,
+                      topic: str,
+                      message: EventData_,
+                      retain=False,
+                      qos=0,
+                      err=True,
+                      **kwargs):
         payload = json.dumps(message) if message is not None else None
-        info = self.client.publish(topic, payload, **kwargs)
+        info = self.client.publish(topic, payload, retain=retain, qos=qos, **kwargs)
         error = aiomqtt.error_string(info.rc)
         LOGGER.debug(f'publish({topic}) -> {error}')
         if info.rc != 0 and err:
@@ -313,6 +319,9 @@ def set_client_will(app: web.Application,
 async def publish(app: web.Application,
                   topic: str,
                   message: EventData_,
+                  retain=False,
+                  qos=0,
+                  err=True,
                   **kwargs):
     """
     Publish a new event message.
@@ -329,8 +338,26 @@ async def publish(app: web.Application,
 
         message (dict):
             A JSON-serializable object.
+
+        retain (bool):
+            The MQTT retain flag.
+            When a new listener subscribes to a topic,
+            it is sent the last retained message by the broker.
+
+        qos (int):
+            The MQTT quality-of-service flag.
+            Must be 0, 1, or 2.
+
+        err (bool):
+            Local flag to determine error handling.
+            If set to `False`, no exception is raised when the message could not be published.
     """
-    await handler(app).publish(topic, message, **kwargs)
+    await handler(app).publish(topic,
+                               message,
+                               retain,
+                               qos,
+                               err,
+                               **kwargs)
 
 
 async def subscribe(app: web.Application, topic: str):

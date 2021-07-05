@@ -14,11 +14,11 @@ TESTED = repeater.__name__
 
 class RepeaterDummy(repeater.RepeaterFeature):
 
-    def __init__(self, app):
+    def __init__(self, app, **kwargs):
         self.prepare_mock = Mock()
         self.run_mock = Mock()
         self.interval = 0.01
-        super().__init__(app)
+        super().__init__(app, **kwargs)
 
     async def prepare(self):
         self.prepare_mock()
@@ -68,6 +68,9 @@ def app(app):
     run_error.run_mock.side_effect = RuntimeError
     features.add(app, run_error, 'run_error')
 
+    run_nostart = RepeaterDummy(app, autostart=False)
+    features.add(app, run_nostart, 'run_nostart')
+
     run_resume = ResumeDummy(app)
     features.add(app, run_resume, 'run_resume')
 
@@ -82,6 +85,7 @@ async def test_dummies(app, client):
     run_cancel = features.get(app, key='run_cancel')
     run_acancel = features.get(app, key='run_acancel')
     run_error = features.get(app, key='run_error')
+    run_nostart = features.get(app, key='run_nostart')
     run_resume = features.get(app, key='run_resume')
 
     await asyncio.sleep(0.1)
@@ -113,6 +117,10 @@ async def test_dummies(app, client):
     assert run_error.active
     assert run_error.prepare_mock.call_count == 1
     assert run_error.run_mock.call_count > 1
+
+    assert not run_nostart.active
+    assert run_nostart.prepare_mock.call_count == 0
+    assert run_nostart.run_mock.call_count == 0
 
     assert run_resume.active
     assert run_resume.prepare_mock.call_count == 1

@@ -2,7 +2,7 @@
 Registers and gets features added to Aiohttp by brewblox services.
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from enum import Enum, auto
 from functools import wraps
 from typing import Any, Hashable, Optional, Type, Union
@@ -179,6 +179,36 @@ class ServiceFeature(ABC):
             return retv
         return decorator
 
+    async def _startup(self, app: web.Application):
+        """
+        Internal lifecycle hook.
+        This allows intermediate classes to extend lifecycle callbacks
+        without the user having to explicitly call the super() implementation.
+
+        Only override this if you know what you are doing.
+        """
+        await self.startup(app)
+
+    async def _before_shutdown(self, app: web.Application):
+        """
+        Internal lifecycle hook.
+        This allows intermediate classes to extend lifecycle callbacks
+        without the user having to explicitly call the super() implementation.
+
+        Only override this if you know what you are doing.
+        """
+        await self.before_shutdown(app)
+
+    async def _shutdown(self, app: web.Application):
+        """
+        Internal lifecycle hook.
+        This allows intermediate classes to extend lifecycle callbacks
+        without the user having to explicitly call the super() implementation.
+
+        Only override this if you know what you are doing.
+        """
+        await self.shutdown(app)
+
     def __init__(self, app: web.Application, startup=Startup.AUTODETECT):
         """
         ServiceFeature constructor.
@@ -207,9 +237,9 @@ class ServiceFeature(ABC):
             startup == Startup.MANAGED,
             startup == Startup.AUTODETECT and not app.frozen
         ]):
-            app.on_startup.append(self.__hook(self.startup, 'startup'))
-            app.on_shutdown.append(self.__hook(self.before_shutdown, 'before_shutdown'))
-            app.on_cleanup.append(self.__hook(self.shutdown, 'shutdown'))
+            app.on_startup.append(self.__hook(self._startup, 'startup'))
+            app.on_shutdown.append(self.__hook(self._before_shutdown, 'before_shutdown'))
+            app.on_cleanup.append(self.__hook(self._shutdown, 'shutdown'))
 
     def __str__(self):
         return f'<{type(self).__name__}>'
@@ -223,11 +253,10 @@ class ServiceFeature(ABC):
         """
         return self.__active_app
 
-    @abstractmethod
     async def startup(self, app: web.Application):
         """Lifecycle hook for initializing the feature in an async context.
 
-        Subclasses are expected to override this function.
+        Unless overridden by subclasses, this function is a no-op.
 
         Depending on the `startup` argument in `__init__()`,
         `startup()` will be called when Aiohttp starts running.
@@ -240,7 +269,7 @@ class ServiceFeature(ABC):
     async def before_shutdown(self, app: web.Application):
         """Lifecycle hook for preparing to shut down the feature.
 
-        Subclasses may override this function, but it is not mandatory.
+        Unless overridden by subclasses, this function is a no-op.
 
         Depending on the `startup` argument in `__init__()`,
         `before_shutdown()` will be called when Aiohttp is closing.
@@ -250,11 +279,10 @@ class ServiceFeature(ABC):
                 Current Aiohttp application.
         """
 
-    @abstractmethod
     async def shutdown(self, app: web.Application):
         """Lifecycle hook for shutting down the feature before the event loop is closed.
 
-        Subclasses are expected to override this function.
+        Unless overridden by subclasses, this function is a no-op.
 
         Depending on the `startup` argument in `__init__()`,
         `shutdown()` will be called when Aiohttp is closing.
