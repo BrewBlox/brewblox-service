@@ -1,28 +1,31 @@
 [tool.poetry]
 name = "brewblox-service"
-version = "0.33.0"
+version = "0.34.0"
 description = "Scaffolding for Brewblox backend services"
 authors = ["BrewPi <development@brewpi.com>"]
 license = "GPL-3.0"
 readme = "README.md"
 
+[tool.pyright]
+include = ["brewblox_service"]
+exclude = ["**/node_modules", "**/__pycache__"]
+
 [tool.poetry.dependencies]
-python = ">=3.7,<4"
-aiohttp = "^3.7.4"
-aiomqtt = "^0.1.3"
-aiohttp-apispec = "^2.2.1"
+python = ">=3.9,<4"
+aiohttp = ">=3.7"
+aiomqtt = ">=0.1"
+aiohttp-apispec = ">=2.2"
 
 [tool.poetry.dev-dependencies]
-flake8 = "^3.9.2"
+flake8 = "^4.0.1"
 pytest-flake8 = "^1.0.7"
-pytest-cov = "^2.12.0"
+pytest-cov = "^3.0.0"
 pytest-mock = "^3.6.1"
 pytest-aiohttp = "^0.3.0"
-autopep8 = "^1.5.7"
+autopep8 = "^1.6.0"
 aresponses = "^2.1.4"
-pytest = "^6.2.4"
-flake8-quotes = "^3.2.0"
-asyncmock = "^0.4.2"
+pytest = "^6.2.5"
+flake8-quotes = "^3.3.1"
 
 [build-system]
 requires = ["poetry>=0.12"]

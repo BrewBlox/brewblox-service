@@ -3,9 +3,9 @@ Tests brewblox_service.mqtt
 """
 import asyncio
 from subprocess import PIPE, check_call, check_output
+from unittest.mock import AsyncMock, call
 
 import pytest
-from mock import AsyncMock, call
 
 from brewblox_service import mqtt, scheduler
 from brewblox_service.testing import response

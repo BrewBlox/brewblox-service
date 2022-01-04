@@ -47,7 +47,7 @@ async def test_cleanup(app, client):
     async def dummy():
         pass
 
-    sched = scheduler.get_scheduler(app)
+    sched = scheduler.fget(app)
     start_count = len(sched._tasks)
     task = await scheduler.create(app, dummy())
     await asyncio.sleep(0.01)

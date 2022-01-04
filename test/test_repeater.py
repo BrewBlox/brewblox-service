@@ -3,9 +3,9 @@ Tests brewblox_service.repeater
 """
 
 import asyncio
+from unittest.mock import Mock
 
 import pytest
-from mock import Mock
 
 from brewblox_service import features, repeater, scheduler
 

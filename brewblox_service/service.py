@@ -29,7 +29,7 @@ import logging
 import sys  # noqa
 import tempfile
 from os import getenv
-from typing import List, Optional
+from typing import Optional
 
 from aiohttp import web
 from aiohttp_apispec import docs, setup_aiohttp_apispec, validation_middleware
@@ -108,7 +108,7 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
 def create_app(
         default_name: str = None,
         parser: argparse.ArgumentParser = None,
-        raw_args: Optional[List[str]] = None
+        raw_args: Optional[list[str]] = None
 ) -> web.Application:
     """
     Creates and configures an Aiohttp application.

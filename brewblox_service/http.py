@@ -32,7 +32,7 @@ def setup(app: web.Application):
     features.add(app, HTTPClient(app))
 
 
-def get_client(app: web.Application) -> HTTPClient:
+def fget(app: web.Application) -> HTTPClient:
     return features.get(app, HTTPClient)
 
 
@@ -42,4 +42,4 @@ def session(app: web.Application) -> ClientSession:
     Shortcut for `HTTPClient.session`.
     It requires setup() to have been called().
     """
-    return get_client(app).session
+    return fget(app).session
