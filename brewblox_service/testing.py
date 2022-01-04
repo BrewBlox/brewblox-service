@@ -9,13 +9,17 @@ from aiohttp.client_exceptions import ContentTypeError
 
 async def response(request, status=200):
     retv = await request
+    payload = await retv.text()
+
     if retv.status != status:
         print(retv)
-        assert retv == status
+        print(payload)
+        raise AssertionError(f'Unexpected response code. (Expected {status}, got {retv.status})')
+
     try:
         return await retv.json()
     except ContentTypeError:
-        return await retv.text()
+        return payload
 
 
 class matching:

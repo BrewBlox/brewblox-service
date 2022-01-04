@@ -26,7 +26,7 @@ import json
 from contextlib import suppress
 from dataclasses import dataclass, field
 from ssl import CERT_NONE
-from typing import Awaitable, Callable, List, Optional, Tuple, Union
+from typing import Awaitable, Callable, Optional, Union
 
 import aiomqtt
 from aiohttp import web
@@ -145,8 +145,8 @@ class EventHandler(features.ServiceFeature):
         self.client: aiomqtt.Client = None
 
         self._connect_ev: asyncio.Event = None
-        self._subs: List[str] = []
-        self._listeners: List[Tuple[str, ListenerCallback_]] = []
+        self._subs: list[str] = []
+        self._listeners: list[tuple[str, ListenerCallback_]] = []
 
     def __str__(self):
         return f'<{type(self).__name__} for {self.config}>'

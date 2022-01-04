@@ -4,7 +4,7 @@ Background task scheduling.
 
 import asyncio
 from contextlib import suppress
-from typing import Any, Coroutine, Optional, Set
+from typing import Any, Coroutine, Optional
 
 from aiohttp import web
 
@@ -20,7 +20,7 @@ class TaskScheduler(features.ServiceFeature):
 
     def __init__(self, app: web.Application):
         super().__init__(app)
-        self._tasks: Set[asyncio.Task] = set()
+        self._tasks: set[asyncio.Task] = set()
 
     async def startup(self, *_):
         await self.create(self._cleanup())
@@ -46,11 +46,7 @@ class TaskScheduler(features.ServiceFeature):
                      coro: Coroutine,
                      name: str = None,
                      ) -> asyncio.Task:
-        try:
-            task = asyncio.create_task(coro, name=name)
-        except TypeError:  # pragma: no cover
-            # The name argument was introduced in Python 3.8
-            task = asyncio.create_task(coro)
+        task = asyncio.create_task(coro, name=name)
         LOGGER.debug(f'Scheduled {task}')
         self._tasks.add(task)
         return task
@@ -87,7 +83,7 @@ def setup(app: web.Application):
     features.add(app, TaskScheduler(app))
 
 
-def get_scheduler(app: web.Application) -> TaskScheduler:
+def fget(app: web.Application) -> TaskScheduler:
     """Gets the default TaskScheduler object
 
     Args:
@@ -147,7 +143,7 @@ async def create(app: web.Application,
         service.furnish(app)
         service.run(app)
     """
-    return await get_scheduler(app).create(coro, name=name)
+    return await fget(app).create(coro, name=name)
 
 
 async def cancel(app: web.Application,
@@ -207,4 +203,4 @@ async def cancel(app: web.Application,
         service.furnish(app)
         service.run(app)
     """
-    return await get_scheduler(app).cancel(task, wait_for=wait_for)
+    return await fget(app).cancel(task, wait_for=wait_for)

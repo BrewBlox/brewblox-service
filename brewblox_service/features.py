@@ -88,8 +88,8 @@ def get(app: web.Application,
 
     try:
         found = app[FEATURES_KEY][actual]
-    except KeyError:
-        raise KeyError(f'No feature found for "{actual}"')
+    except KeyError as ex:
+        raise KeyError(f'No feature found for "{actual}"') from ex
 
     if feature_type and not isinstance(found, feature_type):
         raise AssertionError(f'Found {found} did not match type "{feature_type}"')
