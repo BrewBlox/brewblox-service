@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, call
 import pytest
 
 from brewblox_service import mqtt, scheduler
-from brewblox_service.testing import response
 
 TESTED = mqtt.__name__
 
@@ -121,9 +120,8 @@ async def test_listen(app, client, connected, manual_handler):
     cb4 = AsyncMock()
     await mqtt.listen(app, 'flapjacks', cb4)
 
-    # subscribe using the REST API
-    await response(client.post('/_debug/subscribe',
-                               json={'topic': 'brewcast/#'}))
+    # Subscribe to a catch-all wildcard
+    await mqtt.subscribe(app, 'brewcast/#')
 
     # subscribe/unsubscribe on connected client
     await mqtt.subscribe(app, 'pink/#')
@@ -162,11 +160,7 @@ async def test_listen(app, client, connected, manual_handler):
     await mqtt.publish(app, 'brewcast/state/test', {})
     await mqtt.publish(app, 'brewcast/empty', None)
     await manual_handler.publish('brewcast/other', {'meaning_of_life': True})
-    await response(client.post('/_debug/publish',
-                               json={
-                                   'topic': 'brewcast/state/other',
-                                   'message': {},
-                               }))
+    await mqtt.publish(app, 'brewcast/state/other', {})
 
     manual_handler.client.publish('brewcast/invalid', '{')
 

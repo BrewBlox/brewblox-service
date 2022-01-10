@@ -6,11 +6,15 @@ from asyncio import CancelledError
 from unittest.mock import call
 
 import pytest
-from aiohttp import web_exceptions
+from aiohttp import web, web_exceptions
 from aiohttp.client_exceptions import ServerDisconnectedError
+from aiohttp_pydantic.oas.typing import r200
+from aiohttp_pydantic.view import PydanticView
+from pydantic import BaseModel
 
 from brewblox_service import features, service, testing
 
+routes = web.RouteTableDef()
 TESTED = service.__name__
 
 
@@ -22,10 +26,37 @@ class DummyFeature(features.ServiceFeature):
         pass
 
 
+class MultiplyArgs(BaseModel):
+    a: float
+    b: float
+
+
+class MultiplyResult(MultiplyArgs):
+    result: float
+
+
+@routes.view('/_service/status')
+class HealthcheckView(web.View):
+    async def get(self):
+        return web.json_response({'status': 'ok'})
+
+
+@routes.view('/multiply')
+class MultiplyView(PydanticView):
+    async def post(self, args: MultiplyArgs) -> r200[MultiplyResult]:
+        result = MultiplyResult(
+            a=args.a,
+            b=args.b,
+            result=args.a*args.b,
+        )
+        return web.json_response(result.dict())
+
+
 @pytest.fixture
-def app(app, mocker):
+def app(app: web.Application, mocker):
     app.router.add_static(prefix='/static', path='/usr')
     features.add(app, DummyFeature(app))
+    app.add_routes(routes)
     service.furnish(app)
     return app
 
@@ -144,6 +175,16 @@ async def test_error_cors(app, client, mocker):
     mocker.patch(TESTED + '.web.json_response').side_effect = CancelledError
     with pytest.raises(ServerDisconnectedError):
         await client.get('/test_app/_service/status')
+
+
+async def test_multiply(app, client):
+    res = await testing.response(client.post('/test_app/multiply', json={'a': 3, 'b': 2}))
+    assert res == {'a': 3, 'b': 2, 'result': pytest.approx(6)}
+
+    res = await testing.response(client.post('/test_app/multiply', json={'a': 3, 'b': 2, 'c': 3}))
+    assert res == {'a': 3, 'b': 2, 'result': pytest.approx(6)}
+
+    await testing.response(client.post('/test_app/multiply', json={}), status=400)
 
 
 def test_run(app, mocker):

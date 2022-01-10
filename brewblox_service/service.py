@@ -32,7 +32,7 @@ from os import getenv
 from typing import Optional
 
 from aiohttp import web
-from aiohttp_apispec import docs, setup_aiohttp_apispec, validation_middleware
+from aiohttp_pydantic import oas
 
 from brewblox_service import brewblox_logger, cors, features
 
@@ -145,19 +145,9 @@ def create_app(
 
     app = web.Application()
     app['config'] = vars(args)
-    prefix = '/' + args.name.lstrip('/')
 
     app.middlewares.append(cors.cors_middleware)
-    app.middlewares.append(validation_middleware)
-
-    setup_aiohttp_apispec(
-        app=app,
-        title=args.name,
-        version='v1',
-        url=f'{prefix}/api/doc/swagger.json',
-        swagger_path=f'{prefix}/api/doc',
-        static_path=f'{prefix}/static/swagger',
-    )
+    oas.setup(app, url_prefix='/api/doc', title_spec=args.name)
 
     return app
 
@@ -177,16 +167,9 @@ def furnish(app: web.Application):
     name = config['name']
     prefix = '/' + name.lstrip('/')
 
-    prefixed_paths = [
-        f'{prefix}/api/doc/swagger.json',
-        f'{prefix}/api/doc',
-        f'{prefix}/static/swagger',
-    ]
-
     app.router.add_routes(routes)
     for resource in app.router.resources():
-        if resource.canonical not in prefixed_paths:
-            resource.add_prefix(prefix)
+        resource.add_prefix(prefix)
 
     LOGGER.info(f'Service name: {name}')
     LOGGER.info(f'Service info: {getenv("SERVICE_INFO")}')
@@ -224,12 +207,3 @@ def run(app: web.Application, listen_http: bool = True):
         # This is useful for services without a meaningful REST API
         with tempfile.TemporaryDirectory() as tmpdir:
             web.run_app(app, path=f'{tmpdir}/dummy.sock')
-
-
-@docs(
-    tags=['Service'],
-    summary='Service health check',
-)
-@routes.get('/_service/status')
-async def healthcheck(request: web.Request) -> web.Response:
-    return web.json_response({'status': 'ok'})
