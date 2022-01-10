@@ -26,19 +26,17 @@ import json
 from contextlib import suppress
 from dataclasses import dataclass, field
 from ssl import CERT_NONE
-from typing import Awaitable, Callable, Optional, Union
+from typing import Awaitable, Callable, Union
 
 import aiomqtt
 from aiohttp import web
-from aiohttp_apispec import docs, request_schema
-from marshmallow import Schema, fields
 
 from brewblox_service import brewblox_logger, features, strex
 
 LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
 
-EventData_ = Optional[Union[dict, list]]
+EventData_ = Union[dict, list, None]
 ListenerCallback_ = Callable[[str, EventData_], Awaitable[None]]
 
 DEFAULT_PORTS = {
@@ -441,38 +439,3 @@ async def unlisten(app: web.Application, topic: str, callback: ListenerCallback_
             Must match the `callback` argument earlier used in `listen(topic, callback)`.
     """
     await handler(app).unlisten(topic, callback)
-
-
-class MQTTPublishSchema(Schema):
-    topic = fields.String()
-    message = fields.Dict()
-
-
-class MQTTSubscribeSchema(Schema):
-    topic = fields.String()
-
-
-@docs(
-    tags=['MQTT'],
-    summary='Publish an event message.',
-    description='This is a debugging / diagnostics endpoint.'
-)
-@routes.post('/_debug/publish')
-@request_schema(MQTTPublishSchema())
-async def post_publish(request):
-    data = request['data']
-    await publish(request.app, data['topic'], data['message'])
-    return web.Response()
-
-
-@docs(
-    tags=['MQTT'],
-    summary='Subscribe to event messages.',
-    description='This is a debugging / diagnostics endpoint. '
-    'Messages received for this subscription will be logged and then discarded.'
-)
-@routes.post('/_debug/subscribe')
-@request_schema(MQTTSubscribeSchema())
-async def post_subscribe(request):
-    await subscribe(request.app, request['data']['topic'])
-    return web.Response()

@@ -33,7 +33,7 @@ service.furnish(app)
 service.run(app)
 ```
 
-This will get you a working web application, but it will only support the `/_service/status` health check endpoint.
+This will get you a working web application, but it will not have any endpoints.
 
 Applications can configure their own features, and add new commandline arguments.
 
