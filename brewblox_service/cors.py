@@ -33,8 +33,11 @@ async def cors_middleware(request: web.Request, handler) -> web.Response:
         except asyncio.CancelledError:
             raise
         except web_exceptions.HTTPError as ex:
-            response = ex
+            set_cors_headers(request, ex)
+            raise ex
         except Exception as ex:
-            response = web_exceptions.HTTPInternalServerError(reason=strex(ex))
+            ex_wrapper = web_exceptions.HTTPInternalServerError(reason=strex(ex))
+            set_cors_headers(request, ex_wrapper)
+            raise ex_wrapper
 
         return set_cors_headers(request, response)

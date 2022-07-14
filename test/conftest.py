@@ -52,25 +52,18 @@ def sys_args(app_config) -> list:
 
 
 @pytest.fixture
-def event_loop(loop):
-    # aresponses uses the "event_loop" fixture
-    # this makes loop available under either name
-    yield loop
-
-
-@pytest.fixture
 def app(sys_args):
     app = service.create_app('default', raw_args=sys_args[1:])
     return app
 
 
 @pytest.fixture
-async def client(app, aiohttp_client, loop):
+async def client(app, aiohttp_client, aiohttp_server):
     """Allows patching the app or aiohttp_client before yielding it.
 
     Any tests wishing to add custom behavior to app can override the fixture
     """
-    return await aiohttp_client(app)
+    return await aiohttp_client(await aiohttp_server(app))
 
 
 @pytest.fixture(scope='session')
