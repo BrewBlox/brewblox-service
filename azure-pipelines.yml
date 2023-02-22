@@ -40,6 +40,6 @@ steps:
 
   - bash: |
       pip install twine
-      twine upload -u $(PYPI_USER) -p $(PYPI_PASSWORD) --skip-existing dist/*
+      twine upload -u $(PYPI_USER) -p $(PYPI_PASSWORD) --skip-existing dist/*.tar.gz
     displayName: Deploy to PyPi
     condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
