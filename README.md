@@ -82,8 +82,8 @@ To publish data, all you need is the `publish(topic, message)` function.
 To listen to incoming messages, you can combine `subscribe(topic)` with one or more calls to `listen(topic, callback)`.
 The subscribe/listen functions allow for + and # wildcards to be used.
 
-For a detailed explanation of how to use MQTT topics, see http://www.steves-internet-guide.com/understanding-mqtt-topics/.
+For a detailed explanation of how to use MQTT topics, see <http://www.steves-internet-guide.com/understanding-mqtt-topics/>.
 
-For the Brewblox spec on how and where to publish data, see https://brewblox.netlify.app/dev/reference/event_logging.html.
+For the Brewblox spec on how and where to publish data, see <https://brewblox.com/dev/reference/events.html>.
 
 Includes top-level convenience functions for `publish(topic, message)`, `listen(topic, callback)` and `subscribe(topic)`.

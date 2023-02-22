@@ -1,5 +1,5 @@
 pool:
-  vmImage: 'Ubuntu-20.04'
+  vmImage: "Ubuntu-22.04"
 
 trigger:
   tags:
@@ -12,7 +12,7 @@ trigger:
 pr:
   branches:
     include:
-      - '*'
+      - "*"
 
 variables:
   # Variables imported from brewblox group:
@@ -21,24 +21,25 @@ variables:
   - group: brewblox
 
 steps:
-- task: UsePythonVersion@0
-  inputs:
-    addToPath: true
-    versionSpec: '3.9'
-    architecture: 'x64'
+  - task: UsePythonVersion@0
+    inputs:
+      addToPath: true
+      versionSpec: "3.9"
+      architecture: "x64"
 
-- bash: |
-    pip install poetry
-    poetry install
-    poetry build
-  displayName: Install
+  - bash: |
+      pip install poetry
+      poetry install
+      poetry build
+    displayName: Install
 
-- bash: |
-    poetry run pytest
-  displayName: Test
+  - bash: |
+      poetry run pytest
+      poetry run flake8
+    displayName: Test
 
-- bash: |
-    pip install twine
-    twine upload -u $(PYPI_USER) -p $(PYPI_PASSWORD) --skip-existing dist/*
-  displayName: Deploy to PyPi
-  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  - bash: |
+      pip install twine
+      twine upload -u $(PYPI_USER) -p $(PYPI_PASSWORD) --skip-existing dist/*
+    displayName: Deploy to PyPi
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
