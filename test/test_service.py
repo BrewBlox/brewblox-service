@@ -162,7 +162,7 @@ async def test_error_cors(app, client, mocker):
     assert res.status == 500
     assert 'Access-Control-Allow-Origin' in res.headers
 
-    mocker.patch(TESTED + '.web.json_response').return_value = web_exceptions.HTTPUnauthorized(reason='')
+    mocker.patch(TESTED + '.web.json_response').side_effect = web_exceptions.HTTPUnauthorized(reason='')
     res = await client.get('/test_app/_service/status')
     assert res.status == 401
     assert 'Access-Control-Allow-Origin' in res.headers
