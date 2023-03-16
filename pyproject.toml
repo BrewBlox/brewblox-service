@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "brewblox-service"
-version = "1.0.2"
+version = "2.0.0"
 description = "Scaffolding for Brewblox backend services"
 authors = ["BrewPi <development@brewpi.com>"]
 license = "GPL-3.0"
@@ -16,7 +16,7 @@ aiohttp = ">=3.7"
 aiomqtt = ">=0.1"
 aiohttp-pydantic = ">=1.12"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 flake8 = "*"
 pytest-cov = "*"
 pytest-mock = "*"

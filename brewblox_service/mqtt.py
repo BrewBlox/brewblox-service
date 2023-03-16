@@ -22,11 +22,10 @@ Example use:
 """
 
 import asyncio
-import json
 from contextlib import suppress
 from dataclasses import dataclass, field
 from ssl import CERT_NONE
-from typing import Awaitable, Callable, Union
+from typing import Awaitable, Callable, Optional, Union
 
 import aiomqtt
 from aiohttp import web
@@ -36,8 +35,8 @@ from brewblox_service import brewblox_logger, features, strex
 LOGGER = brewblox_logger(__name__)
 routes = web.RouteTableDef()
 
-EventData_ = Union[dict, list, None]
-ListenerCallback_ = Callable[[str, EventData_], Awaitable[None]]
+EventData_ = Union[str, bytes, None]
+ListenerCallback_ = Callable[[str, str], Awaitable[None]]
 
 DEFAULT_PORTS = {
     'mqtt': 1883,
@@ -59,8 +58,8 @@ class MQTTConfig:
     host: str
     port: int
     path: str
+    client_will: Optional[dict] = None
     transport: str = field(init=False)
-    client_will: dict = field(init=False)
 
     def __post_init__(self):
         if self.protocol not in ['ws', 'wss', 'mqtt', 'mqtts']:
@@ -75,8 +74,6 @@ class MQTTConfig:
 
         if not self.port or self.port == 5672:
             self.port = DEFAULT_PORTS[self.protocol]
-
-        self.client_will = {}
 
     def __str__(self):
         return f'{self.protocol}://{self.host}:{self.port}{self.path}'
@@ -124,21 +121,21 @@ class EventHandler(features.ServiceFeature):
         path (str):
             Path to the broker.
             This value is ignored if mqtt/mqtts protocols are set.
-            The default path for the RabbitMQ broker is '/eventbus'
+            The default path for the broker is '/eventbus'
 
             Examples: (formatted as <protocol>://<host>:<port><path>)
                 ws://eventbus:15675/eventbus
                 wss://BREWBLOX_HOST:443/eventbus
     """
 
-    def __init__(self, app: web.Application, **args):
+    def __init__(self, app: web.Application, **kwargs):
         super().__init__(app)
 
         config = app['config']
-        protocol = args.get('protocol', config['mqtt_protocol'])
-        host = args.get('host', config['mqtt_host'])
-        port = args.get('port', config['mqtt_port'])
-        path = args.get('path', config['mqtt_path'])
+        protocol = kwargs.get('protocol', config['mqtt_protocol'])
+        host = kwargs.get('host', config['mqtt_host'])
+        port = kwargs.get('port', config['mqtt_port'])
+        path = kwargs.get('path', config['mqtt_path'])
         self.config = MQTTConfig(protocol, host, port, path)
         self.client: aiomqtt.Client = None
 
@@ -158,9 +155,8 @@ class EventHandler(features.ServiceFeature):
     def set_client_will(self, topic: str, message: EventData_, **kwargs):
         if self.client:
             raise RuntimeError('Client will must be set before startup')
-        payload = json.dumps(message) if message is not None else None
         self.config.client_will = dict(topic=topic,
-                                       payload=payload,
+                                       payload=decoded(message),
                                        **kwargs)
 
     @staticmethod
@@ -207,9 +203,9 @@ class EventHandler(features.ServiceFeature):
         LOGGER.info(f'{self} disconnected')
         self._connect_ev.clear()
 
-    async def _handle_callback(self, cb, topic, payload):
+    async def _handle_callback(self, cb: ListenerCallback_, topic: str, payload: str):
         try:
-            await cb(topic, json.loads(payload) if payload else None)
+            await cb(topic, payload)
         except Exception as ex:
             LOGGER.error(f'Exception handling MQTT callback for {topic}: {strex(ex)}')
 
@@ -229,7 +225,7 @@ class EventHandler(features.ServiceFeature):
             asyncio.create_task(self._handle_callback(cb, topic, payload))
 
         if not matching:
-            LOGGER.info(f'{self} recv topic={topic}, msg={payload[:30]}...')
+            LOGGER.info(f'{self} recv topic={topic}, msg={str(payload)[:30]}...')
 
     async def publish(self,
                       topic: str,
@@ -238,8 +234,7 @@ class EventHandler(features.ServiceFeature):
                       qos=0,
                       err=True,
                       **kwargs):
-        payload = json.dumps(message) if message is not None else None
-        info = self.client.publish(topic, payload, retain=retain, qos=qos, **kwargs)
+        info = self.client.publish(topic, decoded(message), retain=retain, qos=qos, **kwargs)
         error = aiomqtt.error_string(info.rc)
         LOGGER.debug(f'publish({topic}) -> {error}')
         if info.rc != 0 and err:
@@ -268,7 +263,7 @@ class EventHandler(features.ServiceFeature):
             self._listeners.remove((topic, callback))
 
 
-def setup(app: web.Application):
+def setup(app: web.Application, **kwargs):
     """
     Initializes the EventHandler in the app context.
 
@@ -276,7 +271,7 @@ def setup(app: web.Application):
         app (web.Application):
             The Aiohttp Application object.
     """
-    features.add(app, EventHandler(app))
+    features.add(app, EventHandler(app, **kwargs))
     app.router.add_routes(routes)
 
 
@@ -308,8 +303,8 @@ def set_client_will(app: web.Application,
         topic (str):
             The MQTT message topic. Cannot include wildcards.
 
-        message (dict, None):
-            A JSON-serializable object, or None.
+        message (str, bytes, None):
+            The payload that will be published by the broker on our behalf after disconnecting.
     """
     handler(app).set_client_will(topic, message, **kwargs)
 
@@ -334,8 +329,8 @@ async def publish(app: web.Application,
         topic (str):
             The MQTT message topic. Cannot include wildcards.
 
-        message (dict):
-            A JSON-serializable object.
+        message (str, bytes, None):
+            The message payload.
 
         retain (bool):
             The MQTT retain flag.
@@ -397,6 +392,10 @@ async def listen(app: web.Application, topic: str, callback: ListenerCallback_):
             A filter for message topics.
             Can include the '+' and '#' wildcards.
 
+        callback (Callable[[str, str], Awaitable[None]]):
+            The callback that will be invoked if a message is received.
+            It is expected to be an async function that takes two arguments: topic and payload.
+
     """
     await handler(app).listen(topic, callback)
 
@@ -435,7 +434,7 @@ async def unlisten(app: web.Application, topic: str, callback: ListenerCallback_
         topic (str):
             Must match the `topic` argument earlier used in `listen(topic, callback)`.
 
-        callback (ListenerCallback_):
+        callback (Callable[[str, str], Awaitable[None]]):
             Must match the `callback` argument earlier used in `listen(topic, callback)`.
     """
     await handler(app).unlisten(topic, callback)
