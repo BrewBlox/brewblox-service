@@ -1,9 +1,11 @@
 """
 Tests brewblox_service.mqtt
 """
+
 import asyncio
+import json
 from subprocess import PIPE, check_call, check_output
-from unittest.mock import AsyncMock, call
+from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
@@ -45,8 +47,9 @@ async def connected(app, client, broker):
         await asyncio.wait_for(mqtt.handler(app)._connect_ev.wait(), timeout=5)
     except asyncio.TimeoutError:
         print(check_output('docker ps', shell=True).decode())
-        print(check_output('docker logs -t mqtt-test-broker', shell=True))
         raise
+    finally:
+        print(check_output('docker logs -t mqtt-test-broker', shell=True))
 
 
 @pytest.fixture
@@ -71,6 +74,7 @@ def test_config():
 def test_decoded():
     assert mqtt.decoded(b'testface') == 'testface'
     assert mqtt.decoded('testface') == 'testface'
+    assert mqtt.decoded(None) is None
 
 
 async def test_broker(broker):
@@ -99,19 +103,35 @@ async def test_invalid(app, client, mocker, find_free_port):
         handler.set_client_will('brewcast/nope', None)
 
     with pytest.raises(ConnectionError):
-        await handler.publish('test', {})
+        await handler.publish('test', '')
 
     # Mute error
-    await handler.publish('test', {}, err=False)
+    await handler.publish('test', '', err=False)
 
 
 async def test_publish(app, client, connected):
-    await mqtt.publish(app, 'brewcast/state/test', {'testing': 123})
+    await mqtt.publish(app, 'brewcast/state/test', json.dumps({'testing': 123}))
+
+
+class CallbackRecorder:
+
+    def __init__(self) -> None:
+        self.mock = Mock()
+        self.expected = list()
+        self.evt: asyncio.Event = None
+
+    async def cb(self, topic, message):
+        if not self.evt:
+            self.evt = asyncio.Event()
+        self.mock(topic, message)
+        if self.mock.call_count >= len(self.expected):
+            self.evt.set()
 
 
 async def test_listen(app, client, connected, manual_handler):
     # Set listeners with varying wildcards
-    cb1 = AsyncMock()
+    # Errors in the callback should not interrupt
+    cb1 = AsyncMock(side_effect=RuntimeError)
     await mqtt.listen(app, 'brewcast/#', cb1)
     cb2 = AsyncMock()
     await mqtt.listen(app, 'brewcast/state/+', cb2)
@@ -156,47 +176,48 @@ async def test_listen(app, client, connected, manual_handler):
     await asyncio.wait_for(manual_handler._connect_ev.wait(), timeout=2)
 
     # Publish a set of messages, with varying topics
-    await mqtt.publish(app, 'pink/flamingos', {})
-    await mqtt.publish(app, 'brewcast/state/test', {})
+    await mqtt.publish(app, 'pink/flamingos', 1)
+    await mqtt.publish(app, 'brewcast/state/test', '2')
     await mqtt.publish(app, 'brewcast/empty', None)
-    await manual_handler.publish('brewcast/other', {'meaning_of_life': True})
-    await mqtt.publish(app, 'brewcast/state/other', {})
+    meaning = json.dumps({'meaning_of_life': True})
+    await manual_handler.publish('brewcast/other', meaning)
+    await mqtt.publish(app, 'brewcast/state/other', 3)
+    manual_handler.client.publish('brewcast/bracket', '{')
 
-    manual_handler.client.publish('brewcast/invalid', '{')
+    async def checker():
+        while (cb1.await_count < 5
+               or cb2.await_count < 2
+               or cb3.await_count < 1
+               or cbh1.await_count < 3):
+            await asyncio.sleep(0.1)
 
-    delay_count = 0
-    while (cb1.await_count < 4
-            or cb2.await_count < 2
-           or cb3.await_count < 1
-           or cbh1.await_count < 3):
-        delay_count += 1
-        if delay_count >= 10:
-            break
-        await asyncio.sleep(1)
+    await asyncio.wait_for(checker(), 10)
 
     cb1.assert_has_awaits([
-        call('brewcast/state/test', {}),
-        call('brewcast/other', {'meaning_of_life': True}),
-        call('brewcast/state/other', {}),
-        call('brewcast/empty', None)
+        call('brewcast/state/test', '2'),
+        call('brewcast/empty', ''),
+        call('brewcast/other', meaning),
+        call('brewcast/state/other', '3'),
+        call('brewcast/bracket', '{'),
     ], any_order=True)
 
     cb2.assert_has_awaits([
-        call('brewcast/state/test', {}),
-        call('brewcast/state/other', {}),
+        call('brewcast/state/test', '2'),
+        call('brewcast/state/other', '3'),
     ], any_order=True)
 
     cb3.assert_has_awaits([
-        call('brewcast/state/test', {}),
+        call('brewcast/state/test', '2'),
     ], any_order=True)
 
     cb4.assert_not_awaited()
     cb5.assert_not_awaited()
 
     cbh1.assert_has_awaits([
-        call('brewcast/state/test', {}),
-        call('brewcast/other', {'meaning_of_life': True}),
-        call('brewcast/state/other', {}),
+        call('brewcast/state/test', '2'),
+        call('brewcast/other', meaning),
+        call('brewcast/state/other', '3'),
+        call('brewcast/bracket', '{'),
     ], any_order=True)
 
     cbh2.assert_not_awaited()
