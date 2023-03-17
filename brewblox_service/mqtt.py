@@ -181,7 +181,7 @@ class EventHandler(features.ServiceFeature):
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_message
 
-        LOGGER.info(f'Starting {self}')
+        LOGGER.debug(f'Starting {self}')
         self.client.connect_async(self.config.host, self.config.port)
         self.client.loop_start()
 
@@ -225,7 +225,7 @@ class EventHandler(features.ServiceFeature):
             asyncio.create_task(self._handle_callback(cb, topic, payload))
 
         if not matching:
-            LOGGER.info(f'{self} recv topic={topic}, msg={str(payload)[:30]}...')
+            LOGGER.debug(f'{self} recv topic={topic}, msg={str(payload)[:30]}...')
 
     async def publish(self,
                       topic: str,
@@ -241,24 +241,24 @@ class EventHandler(features.ServiceFeature):
             raise ConnectionError(f'Publish error="{error}", topic="{topic}"')
 
     async def subscribe(self, topic: str):
-        LOGGER.info(f'subscribe({topic})')
+        LOGGER.debug(f'subscribe({topic})')
         self._subs.append(topic)
         if self.connected:
             self.client.subscribe(topic)
 
     async def listen(self, topic: str, callback: ListenerCallback_):
-        LOGGER.info(f'listen({topic})')
+        LOGGER.debug(f'listen({topic})')
         self._listeners.append((topic, callback))
 
     async def unsubscribe(self, topic: str):
-        LOGGER.info(f'unsubscribe({topic})')
+        LOGGER.debug(f'unsubscribe({topic})')
         if self.connected:
             self.client.unsubscribe(topic)
         with suppress(ValueError):
             self._subs.remove(topic)
 
     async def unlisten(self, topic: str, callback: ListenerCallback_):
-        LOGGER.info(f'unlisten({topic})')
+        LOGGER.debug(f'unlisten({topic})')
         with suppress(ValueError):
             self._listeners.remove((topic, callback))
 
