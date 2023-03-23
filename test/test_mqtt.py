@@ -9,14 +9,14 @@ from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
-from brewblox_service import mqtt, scheduler
+from brewblox_service import mqtt, scheduler, testing
 
 TESTED = mqtt.__name__
 
 
 @pytest.fixture(scope='module')
-def broker(find_free_port):
-    mqtt_port = find_free_port()
+def broker():
+    mqtt_port = testing.find_free_port()
     check_call('docker stop mqtt-test-broker || true', shell=True)
     check_call('docker run -d --rm '
                '--name mqtt-test-broker '
@@ -94,8 +94,8 @@ async def test_create_client(app, client, mocker):
     c.will_set.assert_called_once()
 
 
-async def test_invalid(app, client, mocker, find_free_port):
-    handler = mqtt.EventHandler(app, port=find_free_port())
+async def test_invalid(app, client, mocker):
+    handler = mqtt.EventHandler(app, port=testing.find_free_port())
     await handler.shutdown(app)
     await handler.startup(app)
 
