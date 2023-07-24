@@ -30,6 +30,7 @@ def broker():
 
 @pytest.fixture
 def app(app, mocker, broker):
+    mocker.patch(TESTED + '.RECONNECT_INTERVAL_S', 0.001)
     app['config']['mqtt_host'] = '0.0.0.0'
     app['config']['mqtt_protocol'] = 'mqtt'
     app['config']['mqtt_port'] = broker['mqtt']
@@ -42,9 +43,9 @@ def app(app, mocker, broker):
 
 
 @pytest.fixture
-async def connected(app, client, broker):
+async def ready(app, client):
     try:
-        await asyncio.wait_for(mqtt.handler(app)._connect_ev.wait(), timeout=5)
+        await asyncio.wait_for(mqtt.handler(app).ready.wait(), timeout=5)
     except asyncio.TimeoutError:
         print(check_output('docker ps', shell=True).decode())
         raise
@@ -53,9 +54,12 @@ async def connected(app, client, broker):
 
 
 @pytest.fixture
-async def manual_handler(app, client):
+async def manual_handler(app, client) -> mqtt.EventHandler:
     handler = mqtt.EventHandler(app)
+    await handler.startup(app)
     yield handler
+    await handler.end()
+    await handler.before_shutdown(app)
     await handler.shutdown(app)
 
 
@@ -82,7 +86,7 @@ async def test_broker(broker):
 
 
 async def test_create_client(app, client, mocker):
-    m_client = mocker.patch(TESTED + '.aiomqtt.Client')
+    m_client = mocker.patch(TESTED + '.Client')
     cfg = mqtt.MQTTConfig('mqtts', 'localhost', None, '/wunderbar')
 
     assert not cfg.client_will
@@ -90,26 +94,20 @@ async def test_create_client(app, client, mocker):
 
     c = mqtt.EventHandler.create_client(cfg)
     assert c is m_client.return_value
-    c.tls_set.assert_called_once()
-    c.will_set.assert_called_once()
 
 
-async def test_invalid(app, client, mocker):
-    handler = mqtt.EventHandler(app, port=testing.find_free_port())
-    await handler.shutdown(app)
-    await handler.startup(app)
-
+async def test_invalid(app, client, mocker, manual_handler: mqtt.EventHandler):
     with pytest.raises(RuntimeError):
-        handler.set_client_will('brewcast/nope', None)
+        manual_handler.set_client_will('brewcast/nope', None)
 
     with pytest.raises(ConnectionError):
-        await handler.publish('test', '')
+        await manual_handler.publish('test', '')
 
     # Mute error
-    await handler.publish('test', '', err=False)
+    await manual_handler.publish('test', '', err=False)
 
 
-async def test_publish(app, client, connected):
+async def test_publish(app, client, ready):
     await mqtt.publish(app, 'brewcast/state/test', json.dumps({'testing': 123}))
 
 
@@ -128,7 +126,7 @@ class CallbackRecorder:
             self.evt.set()
 
 
-async def test_listen(app, client, connected, manual_handler):
+async def test_listen(app, client, ready, manual_handler: mqtt.EventHandler):
     # Set listeners with varying wildcards
     # Errors in the callback should not interrupt
     cb1 = AsyncMock(side_effect=RuntimeError)
@@ -171,9 +169,9 @@ async def test_listen(app, client, connected, manual_handler):
     await manual_handler.unsubscribe('pink/#')
 
     # Start manually controlled handler
-    # The default one is already connected (see: 'connected' fixture)
-    await manual_handler.startup(app)
-    await asyncio.wait_for(manual_handler._connect_ev.wait(), timeout=2)
+    # The default one is already connected (see: 'ready' fixture)
+    await manual_handler.start()
+    await asyncio.wait_for(manual_handler.ready.wait(), timeout=2)
 
     # Publish a set of messages, with varying topics
     await mqtt.publish(app, 'pink/flamingos', 1)
@@ -182,7 +180,7 @@ async def test_listen(app, client, connected, manual_handler):
     meaning = json.dumps({'meaning_of_life': True})
     await manual_handler.publish('brewcast/other', meaning)
     await mqtt.publish(app, 'brewcast/state/other', 3)
-    manual_handler.client.publish('brewcast/bracket', '{')
+    await manual_handler.publish('brewcast/bracket', '{')
 
     async def checker():
         while (cb1.await_count < 5
@@ -191,7 +189,7 @@ async def test_listen(app, client, connected, manual_handler):
                or cbh1.await_count < 3):
             await asyncio.sleep(0.1)
 
-    await asyncio.wait_for(checker(), 10)
+    await asyncio.wait_for(checker(), timeout=10)
 
     cb1.assert_has_awaits([
         call('brewcast/state/test', '2'),
