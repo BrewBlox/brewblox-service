@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
-from brewblox_service import mqtt, scheduler, testing
+from brewblox_service import features, mqtt, scheduler, testing
 
 TESTED = mqtt.__name__
 
@@ -17,14 +17,16 @@ TESTED = mqtt.__name__
 @pytest.fixture(scope='module')
 def broker():
     mqtt_port = testing.find_free_port()
+    ws_port = testing.find_free_port()
     check_call('docker stop mqtt-test-broker || true', shell=True)
     check_call('docker run -d --rm '
                '--name mqtt-test-broker '
                f'-p {mqtt_port}:1883 '
+               f'-p {ws_port}:15675 '
                'brewblox/mosquitto:develop',
                shell=True,
                stdout=PIPE)
-    yield {'mqtt': mqtt_port}
+    yield {'mqtt': mqtt_port, 'ws': ws_port}
     check_call('docker stop mqtt-test-broker', shell=True)
 
 
@@ -36,31 +38,27 @@ def app(app, mocker, broker):
     app['config']['mqtt_port'] = broker['mqtt']
 
     scheduler.setup(app)
-    mqtt.setup(app)
+    mqtt.setup(app, autostart=False)
     mqtt.set_client_will(app, 'brewcast/rip', None)
+
+    features.add(app,
+                 mqtt.EventHandler(app,
+                                   protocol='ws',
+                                   port=broker['ws'],
+                                   autostart=False),
+                 key='secondary')
 
     return app
 
 
-@pytest.fixture
-async def ready(app, client):
+async def wait_ready(handler: mqtt.EventHandler):
     try:
-        await asyncio.wait_for(mqtt.handler(app).ready.wait(), timeout=5)
+        await asyncio.wait_for(handler.ready.wait(), timeout=5)
     except asyncio.TimeoutError:
         print(check_output('docker ps', shell=True).decode())
         raise
     finally:
-        print(check_output('docker logs -t mqtt-test-broker', shell=True))
-
-
-@pytest.fixture
-async def manual_handler(app, client) -> mqtt.EventHandler:
-    handler = mqtt.EventHandler(app)
-    await handler.startup(app)
-    yield handler
-    await handler.end()
-    await handler.before_shutdown(app)
-    await handler.shutdown(app)
+        print(check_output('docker logs -t mqtt-test-broker', shell=True).decode())
 
 
 def test_config():
@@ -85,29 +83,30 @@ async def test_broker(broker):
     assert 'mqtt-test-broker' in check_output('docker ps --format {{.Names}}', shell=True).decode()
 
 
-async def test_create_client(app, client, mocker):
-    m_client = mocker.patch(TESTED + '.Client')
-    cfg = mqtt.MQTTConfig('mqtts', 'localhost', None, '/wunderbar')
+async def test_create_mqtts(app, client, mocker):
+    handler = mqtt.EventHandler(app, protocol='mqtts', autostart=False)
+    assert handler.config.transport == 'tcp'
 
-    assert not cfg.client_will
-    cfg.client_will = {'topic': 'brewcast/test'}
-
-    c = mqtt.EventHandler.create_client(cfg)
-    assert c is m_client.return_value
+    handler.create_client(handler.config)
 
 
-async def test_invalid(app, client, mocker, manual_handler: mqtt.EventHandler):
+async def test_disconnected(app, client, mocker):
+    handler = mqtt.fget(app)
+
     with pytest.raises(RuntimeError):
-        manual_handler.set_client_will('brewcast/nope', None)
+        handler.set_client_will('brewcast/nope', None)
 
     with pytest.raises(ConnectionError):
-        await manual_handler.publish('test', '')
+        await handler.publish('test', '')
 
     # Mute error
-    await manual_handler.publish('test', '', err=False)
+    await handler.publish('test', '', err=False)
 
 
-async def test_publish(app, client, ready):
+async def test_publish(app, client):
+    handler = mqtt.fget(app)
+    await handler.start()
+    await wait_ready(handler)
     await mqtt.publish(app, 'brewcast/state/test', json.dumps({'testing': 123}))
 
 
@@ -126,7 +125,13 @@ class CallbackRecorder:
             self.evt.set()
 
 
-async def test_listen(app, client, ready, manual_handler: mqtt.EventHandler):
+async def test_listen(app, client):
+    handler = mqtt.fget(app)
+    secondary = features.get(app, mqtt.EventHandler, 'secondary')
+
+    await handler.start()
+    await wait_ready(handler)
+
     # Set listeners with varying wildcards
     # Errors in the callback should not interrupt
     cb1 = AsyncMock(side_effect=RuntimeError)
@@ -153,34 +158,33 @@ async def test_listen(app, client, ready, manual_handler: mqtt.EventHandler):
     await mqtt.unlisten(app, 'brewcast/#', cb5)
 
     # subscribe before connect, and before listen
-    await manual_handler.subscribe('#')
+    await secondary.subscribe('#')
 
     # listen before connect
     cbh1 = AsyncMock()
-    await manual_handler.listen('brewcast/#', cbh1)
+    await secondary.listen('brewcast/#', cbh1)
 
     # listen/unlisten before connect
     cbh2 = AsyncMock()
-    await manual_handler.listen('pink/#', cbh2)
-    await manual_handler.unlisten('pink/#', cbh2)
+    await secondary.listen('pink/#', cbh2)
+    await secondary.unlisten('pink/#', cbh2)
 
     # subscribe/unsubscribe before connect
-    await manual_handler.subscribe('pink/#')
-    await manual_handler.unsubscribe('pink/#')
+    await secondary.subscribe('pink/#')
+    await secondary.unsubscribe('pink/#')
 
-    # Start manually controlled handler
-    # The default one is already connected (see: 'ready' fixture)
-    await manual_handler.start()
-    await asyncio.wait_for(manual_handler.ready.wait(), timeout=2)
+    # Start secondary handler
+    await secondary.start()
+    await wait_ready(secondary)
 
     # Publish a set of messages, with varying topics
     await mqtt.publish(app, 'pink/flamingos', 1)
     await mqtt.publish(app, 'brewcast/state/test', '2')
     await mqtt.publish(app, 'brewcast/empty', None)
     meaning = json.dumps({'meaning_of_life': True})
-    await manual_handler.publish('brewcast/other', meaning)
+    await secondary.publish('brewcast/other', meaning)
     await mqtt.publish(app, 'brewcast/state/other', 3)
-    await manual_handler.publish('brewcast/bracket', '{')
+    await secondary.publish('brewcast/bracket', '{')
 
     async def checker():
         while (cb1.await_count < 5

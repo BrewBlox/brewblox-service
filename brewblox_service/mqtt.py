@@ -3,13 +3,14 @@ Offers publishing and subscribing to MQTT events.
 
 Example use:
 
+    import json
     from brewblox_service import mqtt, scheduler
 
     scheduler.setup(app)
     mqtt.setup(app)
 
     async def on_message(topic, body):
-        print(f'Message published to {topic}')
+        print(f'Message topic: {topic}')
         print(f'Message content: {body}')
 
     mqtt.listen(app, 'brewcast/state/a', on_message)
@@ -17,15 +18,15 @@ Example use:
 
     mqtt.subscribe(app, 'brewcast/state/#')
 
-    await mqtt.publish('app', 'brewcast/state', {'example': True})
-    await mqtt.publish('app', 'brewcast/state/a', {'example': True})
+    await mqtt.publish('app', 'brewcast/state', json.dumps({'example': True}))
+    await mqtt.publish('app', 'brewcast/state/a', json.dumps({'example': True}))
 """
 
 import asyncio
 from contextlib import suppress
 from dataclasses import dataclass, field
 from ssl import CERT_NONE
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Literal, Optional
 
 from aiohttp import web
 from aiomqtt import Client, Message, MqttError, TLSParameters, Will
@@ -34,7 +35,7 @@ from aiomqtt.types import PayloadType
 from brewblox_service import brewblox_logger, features, repeater, strex
 
 LOGGER = brewblox_logger(__name__)
-routes = web.RouteTableDef()
+MQTT_LOGGER = brewblox_logger('aiomqtt')
 
 ListenerCallback_ = Callable[[str, str], Awaitable[None]]
 
@@ -74,7 +75,7 @@ class MQTTConfig:
             self.transport = 'tcp'
             self.path = ''
 
-        if not self.port or self.port == 5672:
+        if not self.port:
             self.port = DEFAULT_PORTS[self.protocol]
 
     def __str__(self):
@@ -130,14 +131,20 @@ class EventHandler(repeater.RepeaterFeature):
                 wss://BREWBLOX_HOST:443/eventbus
     """
 
-    def __init__(self, app: web.Application, **kwargs):
+    def __init__(self,
+                 app: web.Application,
+                 protocol: Literal['ws', 'wss', 'mqtt', 'mqtts'] = None,
+                 host: str = None,
+                 port: int = None,
+                 path: str = None,
+                 **kwargs):
         super().__init__(app, **kwargs)
 
         config = app['config']
-        protocol = kwargs.get('protocol', config['mqtt_protocol'])
-        host = kwargs.get('host', config['mqtt_host'])
-        port = kwargs.get('port', config['mqtt_port'])
-        path = kwargs.get('path', config['mqtt_path'])
+        protocol = protocol or config['mqtt_protocol']
+        host = host or config['mqtt_host']
+        port = port or config['mqtt_port']
+        path = path or config['mqtt_path']
         self.config = MQTTConfig(protocol, host, port, path)
         self.client: Client = None
 
@@ -177,7 +184,8 @@ class EventHandler(repeater.RepeaterFeature):
                         transport=config.transport,
                         websocket_path=config.path,
                         tls_params=tls_params,
-                        will=will)
+                        will=will,
+                        logger=MQTT_LOGGER)
 
         if secure_protocol:
             client._client.tls_insecure_set(True)
@@ -190,12 +198,16 @@ class EventHandler(repeater.RepeaterFeature):
         except Exception as ex:
             LOGGER.error(f'Exception handling MQTT callback for {message.topic}: {strex(ex)}')
 
+    async def startup(self, app: web.Application):
+        self._ready_ev = asyncio.Event()
+        self.client = self.create_client(self.config)
+
     async def run(self):
         await asyncio.sleep(self._connect_delay)
         self._connect_delay = RECONNECT_INTERVAL_S
 
-        async with self.client:
-            try:
+        try:
+            async with self.client:
                 async with self.client.messages() as messages:
                     if self._subscribed_topics:
                         await self.client.subscribe([(t, 0) for t in self._subscribed_topics],
@@ -215,20 +227,8 @@ class EventHandler(repeater.RepeaterFeature):
                         if not matching:
                             LOGGER.debug(f'{self} recv {message}')
 
-            except asyncio.CancelledError:
-                await self.client.disconnect(timeout=1)
-                raise
-
-            finally:
-                self._ready_ev.clear()
-
-    async def startup(self, app: web.Application):
-        self._ready_ev = asyncio.Event()
-        self.client = self.create_client(self.config)
-
-    async def before_shutdown(self, app: web.Application):
-        await self.end()
-        self.client = None
+        finally:
+            self._ready_ev.clear()
 
     async def publish(self,
                       topic: str,
@@ -282,11 +282,24 @@ def setup(app: web.Application, **kwargs):
             The Aiohttp Application object.
     """
     features.add(app, EventHandler(app, **kwargs))
-    app.router.add_routes(routes)
 
 
-def handler(app: web.Application) -> EventHandler:
+def fget(app: web.Application) -> EventHandler:
     """
+    Get registered EventHandler.
+    Requires setup(app) to have been called first.
+
+    Args:
+        app (web.Application):
+            The Aiohttp Application object.
+    """
+    return features.get(app, EventHandler)
+
+
+def handler(app: web.Application) -> EventHandler:  # pragma: no cover
+    """
+    Deprecated: use fget() instead
+
     Get registered EventHandler.
     Requires setup(app) to have been called first.
 
