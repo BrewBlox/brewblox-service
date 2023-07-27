@@ -3,6 +3,8 @@ Testing utility functions
 """
 
 import re
+from contextlib import contextmanager
+from subprocess import DEVNULL, run
 
 from aiohttp.client_exceptions import ContentTypeError
 
@@ -57,3 +59,35 @@ def find_free_port():
     s.close()
 
     return portnum
+
+
+@contextmanager
+def mqtt_broker(name='mqtt-test-broker', image='ghcr.io/brewblox/mosquitto:develop'):
+    """
+    Spawns and closes an MQTT broker image.
+    To prevent conflict, it listens on random free ports.
+    The context manager yields a dict containing the randomly selected port numbers.
+    """
+    mqtt_port = find_free_port()
+    ws_port = find_free_port()
+    run(['docker', 'stop', name], stdout=DEVNULL)
+    run(
+        [
+            'docker',
+            'run',
+            '--rm',
+            '--detach',
+            f'--name={name}',
+            f'--publish={mqtt_port}:1883',
+            f'--publish={ws_port}:15675',
+            image,
+        ],
+        check=True)
+    try:
+        yield {'mqtt': mqtt_port, 'ws': ws_port}
+    except Exception:
+        run(['docker', 'ps'])
+        raise
+    finally:
+        run(['docker', 'logs', '--timestamps', name])
+        run(['docker', 'stop', name], stdout=DEVNULL)

@@ -3,13 +3,14 @@ Offers publishing and subscribing to MQTT events.
 
 Example use:
 
+    import json
     from brewblox_service import mqtt, scheduler
 
     scheduler.setup(app)
     mqtt.setup(app)
 
     async def on_message(topic, body):
-        print(f'Message published to {topic}')
+        print(f'Message topic: {topic}')
         print(f'Message content: {body}')
 
     mqtt.listen(app, 'brewcast/state/a', on_message)
@@ -17,27 +18,29 @@ Example use:
 
     mqtt.subscribe(app, 'brewcast/state/#')
 
-    await mqtt.publish('app', 'brewcast/state', {'example': True})
-    await mqtt.publish('app', 'brewcast/state/a', {'example': True})
+    await mqtt.publish('app', 'brewcast/state', json.dumps({'example': True}))
+    await mqtt.publish('app', 'brewcast/state/a', json.dumps({'example': True}))
 """
 
 import asyncio
 from contextlib import suppress
 from dataclasses import dataclass, field
 from ssl import CERT_NONE
-from typing import Awaitable, Callable, Optional, Union
+from typing import Awaitable, Callable, Literal, Optional
 
-import aiomqtt
 from aiohttp import web
+from aiomqtt import Client, Message, MqttError, TLSParameters, Will
+from aiomqtt.types import PayloadType
 
-from brewblox_service import brewblox_logger, features, strex
+from brewblox_service import brewblox_logger, features, repeater, strex
 
 LOGGER = brewblox_logger(__name__)
-routes = web.RouteTableDef()
+MQTT_LOGGER = brewblox_logger('aiomqtt')
 
-EventData_ = Union[str, bytes, None]
 ListenerCallback_ = Callable[[str, str], Awaitable[None]]
 
+RECONNECT_INTERVAL_S = 2
+INTERACTION_TIMEOUT_S = 5
 DEFAULT_PORTS = {
     'mqtt': 1883,
     'mqtts': 8883,
@@ -46,7 +49,7 @@ DEFAULT_PORTS = {
 }
 
 
-def decoded(msg: Union[str, bytes, bytearray]):
+def decoded(msg: PayloadType):
     if isinstance(msg, (bytes, bytearray)):
         return msg.decode()
     return msg
@@ -72,14 +75,14 @@ class MQTTConfig:
             self.transport = 'tcp'
             self.path = ''
 
-        if not self.port or self.port == 5672:
+        if not self.port:
             self.port = DEFAULT_PORTS[self.protocol]
 
     def __str__(self):
         return f'{self.protocol}://{self.host}:{self.port}{self.path}'
 
 
-class EventHandler(features.ServiceFeature):
+class EventHandler(repeater.RepeaterFeature):
     """
     Connection handler class for MQTT events.
     Handles both TCP and Websocket connections.
@@ -128,123 +131,130 @@ class EventHandler(features.ServiceFeature):
                 wss://BREWBLOX_HOST:443/eventbus
     """
 
-    def __init__(self, app: web.Application, **kwargs):
-        super().__init__(app)
+    def __init__(self,
+                 app: web.Application,
+                 protocol: Literal['ws', 'wss', 'mqtt', 'mqtts'] = None,
+                 host: str = None,
+                 port: int = None,
+                 path: str = None,
+                 **kwargs):
+        super().__init__(app, **kwargs)
 
         config = app['config']
-        protocol = kwargs.get('protocol', config['mqtt_protocol'])
-        host = kwargs.get('host', config['mqtt_host'])
-        port = kwargs.get('port', config['mqtt_port'])
-        path = kwargs.get('path', config['mqtt_path'])
+        protocol = protocol or config['mqtt_protocol']
+        host = host or config['mqtt_host']
+        port = port or config['mqtt_port']
+        path = path or config['mqtt_path']
         self.config = MQTTConfig(protocol, host, port, path)
-        self.client: aiomqtt.Client = None
+        self.client: Client = None
 
-        self._connect_ev: asyncio.Event = None
-        self._subs: list[str] = []
+        self._ready_ev: asyncio.Event = None
+        self._connect_delay: int = 0
+        self._subscribed_topics: list[str] = []
         self._listeners: list[tuple[str, ListenerCallback_]] = []
 
     def __str__(self):
         return f'<{type(self).__name__} for {self.config}>'
 
     @property
-    def connected(self) -> bool:
-        return self.client is not None \
-            and self._connect_ev is not None \
-            and self._connect_ev.is_set()
+    def ready(self) -> Optional[asyncio.Event]:
+        return self._ready_ev
 
-    def set_client_will(self, topic: str, message: EventData_, **kwargs):
+    def set_client_will(self, topic: str, message: PayloadType, **kwargs):
         if self.client:
             raise RuntimeError('Client will must be set before startup')
         self.config.client_will = dict(topic=topic,
-                                       payload=decoded(message),
+                                       payload=message,
                                        **kwargs)
 
     @staticmethod
-    def create_client(config: MQTTConfig) -> aiomqtt.Client:
-        client = aiomqtt.Client(transport=config.transport,
-                                protocol=aiomqtt.MQTTv311)
-        client.ws_set_options(path=config.path)
+    def create_client(config: MQTTConfig) -> Client:
+        secure_protocol = config.protocol in ['mqtts', 'wss']
+        tls_params = None
+        will = None
 
-        if config.protocol in ['mqtts', 'wss']:
-            client.tls_set(cert_reqs=CERT_NONE)
-            client.tls_insecure_set(True)
+        if secure_protocol:
+            tls_params = TLSParameters(cert_reqs=CERT_NONE)
 
         if config.client_will:
-            client.will_set(**config.client_will)
+            will = Will(**config.client_will)
+
+        client = Client(hostname=config.host,
+                        port=config.port,
+                        transport=config.transport,
+                        websocket_path=config.path,
+                        tls_params=tls_params,
+                        will=will,
+                        logger=MQTT_LOGGER)
+
+        if secure_protocol:
+            client._client.tls_insecure_set(True)
 
         return client
 
-    async def startup(self, app: web.Application):
-        self._connect_ev = asyncio.Event()
-        self.client = self.create_client(self.config)
-        self.client.on_connect = self._on_connect
-        self.client.on_disconnect = self._on_disconnect
-        self.client.on_message = self._on_message
-
-        LOGGER.debug(f'Starting {self}')
-        self.client.connect_async(self.config.host, self.config.port)
-        self.client.loop_start()
-
-    async def shutdown(self, app: web.Application):
-        if self.client:
-            self.client.disconnect()
-            await self.client.loop_stop()
-            self.client = None
-
-    def _on_connect(self, *args):
-        LOGGER.debug(f'Applying subscribe for {self._subs}')
-        for topic in self._subs:
-            self.client.subscribe(topic)
-
-        LOGGER.info(f'{self} connected')
-        self._connect_ev.set()
-
-    def _on_disconnect(self, *args):
-        LOGGER.info(f'{self} disconnected')
-        self._connect_ev.clear()
-
-    async def _handle_callback(self, cb: ListenerCallback_, topic: str, payload: str):
+    async def _handle_callback(self, cb: ListenerCallback_, message: Message):
         try:
-            await cb(topic, payload)
+            await cb(str(message.topic), decoded(message.payload))
         except Exception as ex:
-            LOGGER.error(f'Exception handling MQTT callback for {topic}: {strex(ex)}')
+            LOGGER.error(f'Exception handling MQTT callback for {message.topic}: {strex(ex)}')
 
-    def _on_message(self, client, userdata, message, *args):
+    async def startup(self, app: web.Application):
+        self._ready_ev = asyncio.Event()
+        self.client = self.create_client(self.config)
+
+    async def run(self):
+        await asyncio.sleep(self._connect_delay)
+        self._connect_delay = RECONNECT_INTERVAL_S
+
         try:
-            topic = decoded(message.topic)
-            payload = decoded(message.payload)
-        except UnicodeDecodeError:  # pragma: no cover
-            LOGGER.error('Skipping malformed MQTT event')
-            return
+            async with self.client:
+                async with self.client.messages() as messages:
+                    if self._subscribed_topics:
+                        await self.client.subscribe([(t, 0) for t in self._subscribed_topics],
+                                                    timeout=INTERACTION_TIMEOUT_S)
 
-        matching = [cb
-                    for (sub, cb) in self._listeners
-                    if aiomqtt.topic_matches_sub(sub, topic)]
+                    LOGGER.debug(f'{self} is ready')
+                    self._ready_ev.set()
 
-        for cb in matching:
-            asyncio.create_task(self._handle_callback(cb, topic, payload))
+                    async for message in messages:  # pragma: no cover
+                        matching = [cb
+                                    for (topic, cb) in self._listeners
+                                    if message.topic.matches(topic)]
 
-        if not matching:
-            LOGGER.debug(f'{self} recv topic={topic}, msg={str(payload)[:30]}...')
+                        for cb in matching:
+                            asyncio.create_task(self._handle_callback(cb, message))
+
+                        if not matching:
+                            LOGGER.debug(f'{self} recv {message}')
+
+        finally:
+            self._ready_ev.clear()
 
     async def publish(self,
                       topic: str,
-                      message: EventData_,
+                      message: PayloadType,
                       retain=False,
                       qos=0,
                       err=True,
                       **kwargs):
-        info = self.client.publish(topic, decoded(message), retain=retain, qos=qos, **kwargs)
-        error = aiomqtt.error_string(info.rc)
-        LOGGER.debug(f'publish({topic}) -> {error}')
-        if info.rc != 0 and err:
-            raise ConnectionError(f'Publish error="{error}", topic="{topic}"')
+        try:
+            await self.client.publish(topic,
+                                      message,
+                                      retain=retain,
+                                      qos=qos,
+                                      timeout=INTERACTION_TIMEOUT_S,
+                                      **kwargs)
+            LOGGER.debug(f'publish({topic}) -> OK')
+        except MqttError as ex:
+            LOGGER.debug(f'publish({topic}) -> {strex(ex)}')
+            if err:
+                raise ConnectionError(f'Publish error="{strex(ex)}", topic="{topic}"') from ex
 
     async def subscribe(self, topic: str):
         LOGGER.debug(f'subscribe({topic})')
-        self._subs.append(topic)
-        if self.connected:
-            self.client.subscribe(topic)
+        self._subscribed_topics.append(topic)
+        with suppress(MqttError):
+            await self.client.subscribe(topic, timeout=INTERACTION_TIMEOUT_S)
 
     async def listen(self, topic: str, callback: ListenerCallback_):
         LOGGER.debug(f'listen({topic})')
@@ -252,10 +262,10 @@ class EventHandler(features.ServiceFeature):
 
     async def unsubscribe(self, topic: str):
         LOGGER.debug(f'unsubscribe({topic})')
-        if self.connected:
-            self.client.unsubscribe(topic)
+        with suppress(MqttError):
+            await self.client.unsubscribe(topic, timeout=INTERACTION_TIMEOUT_S)
         with suppress(ValueError):
-            self._subs.remove(topic)
+            self._subscribed_topics.remove(topic)
 
     async def unlisten(self, topic: str, callback: ListenerCallback_):
         LOGGER.debug(f'unlisten({topic})')
@@ -272,11 +282,24 @@ def setup(app: web.Application, **kwargs):
             The Aiohttp Application object.
     """
     features.add(app, EventHandler(app, **kwargs))
-    app.router.add_routes(routes)
 
 
-def handler(app: web.Application) -> EventHandler:
+def fget(app: web.Application) -> EventHandler:
     """
+    Get registered EventHandler.
+    Requires setup(app) to have been called first.
+
+    Args:
+        app (web.Application):
+            The Aiohttp Application object.
+    """
+    return features.get(app, EventHandler)
+
+
+def handler(app: web.Application) -> EventHandler:  # pragma: no cover
+    """
+    Deprecated: use fget() instead
+
     Get registered EventHandler.
     Requires setup(app) to have been called first.
 
@@ -289,7 +312,7 @@ def handler(app: web.Application) -> EventHandler:
 
 def set_client_will(app: web.Application,
                     topic: str,
-                    message: EventData_ = None,
+                    message: PayloadType = None,
                     **kwargs):
     """
     Set MQTT Last Will and Testament for client.
@@ -311,7 +334,7 @@ def set_client_will(app: web.Application,
 
 async def publish(app: web.Application,
                   topic: str,
-                  message: EventData_,
+                  message: PayloadType,
                   retain=False,
                   qos=0,
                   err=True,

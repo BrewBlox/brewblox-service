@@ -2,6 +2,7 @@
 Tests brewblox_service.testing
 """
 
+from subprocess import check_output
 from unittest.mock import Mock
 
 import pytest
@@ -49,3 +50,15 @@ def test_matching():
     mock = Mock()
     mock('fart')
     mock.assert_called_with(obj)
+
+
+def test_broker():
+    def active_containers():
+        return check_output(['docker', 'ps', '--format={{.Names}}']).decode()
+
+    with pytest.raises(RuntimeError):
+        with testing.mqtt_broker('broker-test-broker'):
+            assert 'broker-test-broker' in active_containers()
+            raise RuntimeError('Boo!')
+
+    assert 'broker-test-broker' not in active_containers()
