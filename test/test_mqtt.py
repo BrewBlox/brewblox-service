@@ -4,7 +4,7 @@ Tests brewblox_service.mqtt
 
 import asyncio
 import json
-from subprocess import PIPE, check_call, check_output
+from subprocess import check_output
 from unittest.mock import AsyncMock, Mock, call
 
 import pytest
@@ -16,18 +16,8 @@ TESTED = mqtt.__name__
 
 @pytest.fixture(scope='module')
 def broker():
-    mqtt_port = testing.find_free_port()
-    ws_port = testing.find_free_port()
-    check_call('docker stop mqtt-test-broker || true', shell=True)
-    check_call('docker run -d --rm '
-               '--name mqtt-test-broker '
-               f'-p {mqtt_port}:1883 '
-               f'-p {ws_port}:15675 '
-               'brewblox/mosquitto:develop',
-               shell=True,
-               stdout=PIPE)
-    yield {'mqtt': mqtt_port, 'ws': ws_port}
-    check_call('docker stop mqtt-test-broker', shell=True)
+    with testing.mqtt_broker() as ports:
+        yield ports
 
 
 @pytest.fixture
@@ -52,13 +42,7 @@ def app(app, mocker, broker):
 
 
 async def wait_ready(handler: mqtt.EventHandler):
-    try:
-        await asyncio.wait_for(handler.ready.wait(), timeout=5)
-    except asyncio.TimeoutError:
-        print(check_output('docker ps', shell=True).decode())
-        raise
-    finally:
-        print(check_output('docker logs -t mqtt-test-broker', shell=True).decode())
+    await asyncio.wait_for(handler.ready.wait(), timeout=5)
 
 
 def test_config():
