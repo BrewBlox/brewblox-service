@@ -84,5 +84,5 @@ def mqtt_broker(name='mqtt-test-broker'):
         run(['docker', 'ps'])
         raise
     finally:
-        run(['docker', 'logs', '--timestamps', 'mqtt-test-broker'])
+        run(['docker', 'logs', '--timestamps', name])
         run(['docker', 'stop', name], stdout=DEVNULL)
