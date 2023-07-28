@@ -137,11 +137,11 @@ async def create(app: web.Application,
 
         app = service.create_app(default_name='example')
 
-        scheduler.setup(app)
-        app.on_startup.append(start)
+        async def setup():
+            scheduler.setup(app)
+            app.on_startup.append(start)
 
-        service.furnish(app)
-        service.run(app)
+        service.run_app(app, setup())
     """
     return await fget(app).create(coro, name=name)
 
@@ -197,10 +197,10 @@ async def cancel(app: web.Application,
 
         app = service.create_app(default_name='example')
 
-        scheduler.setup(app)
-        app.on_startup.append(start)
+        async def setup():
+            scheduler.setup(app)
+            app.on_startup.append(start)
 
-        service.furnish(app)
-        service.run(app)
+        service.run_app(app, setup())
     """
     return await fget(app).cancel(task, wait_for=wait_for)

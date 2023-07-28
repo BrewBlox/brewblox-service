@@ -12,9 +12,8 @@ TESTED = http.__name__
 
 
 @pytest.fixture
-def app(app, mocker):
+async def app_setup(app, mocker):
     http.setup(app)
-    return app
 
 
 async def test_session(app, client, aresponses: ResponsesMockServer):

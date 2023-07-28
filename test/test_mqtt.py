@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
-from brewblox_service import features, mqtt, scheduler, testing
+from brewblox_service import features, models, mqtt, scheduler, testing
 
 TESTED = mqtt.__name__
 
@@ -21,11 +21,13 @@ def broker():
 
 
 @pytest.fixture
-def app(app, mocker, broker):
+async def app_setup(app, mocker, broker):
     mocker.patch(TESTED + '.RECONNECT_INTERVAL_S', 0.001)
-    app['config']['mqtt_host'] = '0.0.0.0'
-    app['config']['mqtt_protocol'] = 'mqtt'
-    app['config']['mqtt_port'] = broker['mqtt']
+
+    config: models.ServiceConfig = app['config']
+    config.mqtt_host = '0.0.0.0'
+    config.mqtt_protocol = 'mqtt'
+    config.mqtt_port = broker['mqtt']
 
     scheduler.setup(app)
     mqtt.setup(app, autostart=False)
@@ -37,8 +39,6 @@ def app(app, mocker, broker):
                                    port=broker['ws'],
                                    autostart=False),
                  key='secondary')
-
-    return app
 
 
 async def wait_ready(handler: mqtt.EventHandler):
@@ -71,7 +71,7 @@ async def test_create_mqtts(app, client, mocker):
     handler = mqtt.EventHandler(app, protocol='mqtts', autostart=False)
     assert handler.config.transport == 'tcp'
 
-    handler.create_client(handler.config)
+    mqtt._make_client(handler.config)
 
 
 async def test_disconnected(app, client, mocker):

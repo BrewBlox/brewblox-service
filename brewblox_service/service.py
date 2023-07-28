@@ -9,18 +9,16 @@ Example:
     # To add new commandline arguments, use create_parser()
     app = service.create_app(default_name='my_service')
 
-    # (Placeholder names)
-    # All features (endpoints and async handlers) must be created and added to the app here
-    # The Aiohttp Application will freeze functionality once it has been started
-    feature_one.setup(app)
-    feature_two.setup(app)
-
-    # Modify added resources to conform to standards
-    service.furnish(app)
+    async def setup():
+        # (Placeholder names)
+        # All features (endpoints and async handlers) must be created and added to the app here
+        # The Aiohttp Application will freeze functionality once it has been started
+        feature_one.setup(app)
+        feature_two.setup(app)
 
     # Run the application
     # This function blocks until the application is shut down
-    service.run(app)
+    service.run_app(app, setup())
 """
 
 import argparse
@@ -28,16 +26,14 @@ import logging
 # The argumentparser can't fall back to the default sys.argv if sys is not imported
 import sys  # noqa
 import tempfile
-from os import getenv
-from typing import Optional
+from typing import Awaitable, Optional
 
 from aiohttp import web
 from aiohttp_pydantic import oas
 
-from brewblox_service import brewblox_logger, cors, features
+from brewblox_service import brewblox_logger, cors, features, models
 
 LOGGER = brewblox_logger(__name__)
-routes = web.RouteTableDef()
 
 
 def _init_logging(args: argparse.Namespace):
@@ -108,7 +104,8 @@ def create_parser(default_name: str) -> argparse.ArgumentParser:
 def create_app(
         default_name: str = None,
         parser: argparse.ArgumentParser = None,
-        raw_args: Optional[list[str]] = None
+        raw_args: Optional[list[str]] = None,
+        config_cls: type[models.ServiceConfig] = models.ServiceConfig,
 ) -> web.Application:
     """
     Creates and configures an Aiohttp application.
@@ -127,9 +124,13 @@ def create_app(
             Explicit commandline arguments.
             Defaults to sys.argv[1:]
 
+        config_cls (type[models.ServiceConfig], optional):
+            The Pydantic model to load the parsed args.
+            This model should inherit from ServiceConfig.
+
     Returns:
         web.Application: A configured Aiohttp Application object.
-            This Application must be furnished, and is not yet running.
+            This Application is not yet running.
 
     """
 
@@ -143,46 +144,19 @@ def create_app(
     if unknown_args:
         LOGGER.error(f'Unknown arguments detected: {unknown_args}')
 
+    config: models.ServiceConfig = config_cls(**vars(args))
     app = web.Application()
-    app['config'] = vars(args)
+    app['config'] = config
 
     app.middlewares.append(cors.cors_middleware)
-    oas.setup(app, url_prefix='/api/doc', title_spec=args.name)
+    oas.setup(app, url_prefix='/api/doc', title_spec=config.name)
 
     return app
 
 
-def furnish(app: web.Application):
-    """
-    Configures Application routes, readying it for running.
-
-    This function modifies routes and resources that were added by calling code,
-    and must be called immediately prior to `run(app)`.
-
-    Args:
-        app (web.Application):
-            The Aiohttp Application as created by `create_app()`
-    """
-    config = app['config']
-    name = config['name']
-    prefix = '/' + name.lstrip('/')
-
-    app.router.add_routes(routes)
-    for resource in app.router.resources():
-        resource.add_prefix(prefix)
-
-    LOGGER.info(f'Service name: {name}')
-    LOGGER.info(f'Service info: {getenv("SERVICE_INFO")}')
-    LOGGER.info(f'Service config: {config}')
-
-    for route in app.router.routes():
-        LOGGER.debug(f'Endpoint [{route.method}] {route.resource.canonical}')
-
-    for name, impl in app.get(features.FEATURES_KEY, {}).items():
-        LOGGER.debug(f'Feature [{name}] {impl}')
-
-
-def run(app: web.Application, listen_http: bool = True):
+def run_app(app: web.Application,
+            setup: Awaitable = None,
+            listen_http: bool = True):
     """
     Runs the application in an async context.
     This function will block indefinitely until the application is shut down.
@@ -191,19 +165,43 @@ def run(app: web.Application, listen_http: bool = True):
         app (web.Application):
             The Aiohttp Application as created by `create_app()`
 
+        setup (Awaitable):
+            If you have setup that should happen async before app start,
+            you can provide an awaitable here.
+            It will be awaited before application startup.
+
         listen_http (bool):
             Whether to open a port for the REST API.
             Set to False to disable all REST endpoints.
             This can be useful for services that use communication protocols
             other than REST (such as MQTT), or only have active functionality.
     """
-    config = app['config']
+    config: models.ServiceConfig = app['config']
+
+    async def _factory() -> web.Application:
+        if setup is not None:
+            await setup
+
+        prefix = '/' + config.name.lstrip('/')
+        for resource in app.router.resources():
+            resource.add_prefix(prefix)
+
+        LOGGER.info(f'Service name: {config.name}')
+        LOGGER.info(f'Service config: {config}')
+
+        for route in app.router.routes():
+            LOGGER.debug(f'Endpoint [{route.method}] {route.resource.canonical}')
+
+        for name, impl in app.get(features.FEATURES_KEY, {}).items():
+            LOGGER.debug(f'Feature [{name}] {impl}')
+
+        return app
 
     if listen_http:
-        web.run_app(app, host=config['host'], port=config['port'])
+        web.run_app(_factory(), host=config.host, port=config.port)
     else:
         # Listen to a dummy UNIX socket
         # The service still runs, but is not bound to any port
         # This is useful for services without a meaningful REST API
         with tempfile.TemporaryDirectory() as tmpdir:
-            web.run_app(app, path=f'{tmpdir}/dummy.sock')
+            web.run_app(_factory(), path=f'{tmpdir}/dummy.sock')

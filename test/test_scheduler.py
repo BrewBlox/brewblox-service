@@ -13,11 +13,9 @@ TESTED = scheduler.__name__
 
 
 @pytest.fixture
-def app(app, mocker):
+async def app_setup(app, mocker):
     mocker.patch(TESTED + '.CLEANUP_INTERVAL_S', 0.001)
-
     scheduler.setup(app)
-    return app
 
 
 async def test_create_cancel(app, client):

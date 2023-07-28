@@ -2,8 +2,8 @@
 Test functions in brewblox_service.service.py
 """
 
-from asyncio import CancelledError
-from unittest.mock import call
+import asyncio
+from unittest.mock import ANY, call
 
 import pytest
 from aiohttp import web, web_exceptions
@@ -12,7 +12,7 @@ from aiohttp_pydantic.oas.typing import r200
 from aiohttp_pydantic.view import PydanticView
 from pydantic import BaseModel
 
-from brewblox_service import features, service, testing
+from brewblox_service import features, models, service, testing
 
 routes = web.RouteTableDef()
 TESTED = service.__name__
@@ -35,7 +35,11 @@ class MultiplyResult(MultiplyArgs):
     result: float
 
 
-@routes.view('/_service/status')
+class ExtendedConfig(models.ServiceConfig):
+    test: bool
+
+
+@routes.view('/status')
 class HealthcheckView(web.View):
     async def get(self):
         return web.json_response({'status': 'ok'})
@@ -52,13 +56,29 @@ class MultiplyView(PydanticView):
         return web.json_response(result.dict())
 
 
+@routes.view('/runtime_error')
+class RuntimeErrorView(web.View):
+    async def get(self):
+        raise RuntimeError()
+
+
+@routes.view('/auth_error')
+class UnauthorizedErrorView(web.View):
+    async def get(self):
+        raise web_exceptions.HTTPUnauthorized(reason='')
+
+
+@routes.view('/cancelled_error')
+class CancelledErrorView(web.View):
+    async def get(self):
+        raise asyncio.CancelledError()
+
+
 @pytest.fixture
-def app(app: web.Application, mocker):
+async def app_setup(app: web.Application, mocker):
     app.router.add_static(prefix='/static', path='/usr')
     features.add(app, DummyFeature(app))
     app.add_routes(routes)
-    service.furnish(app)
-    return app
 
 
 def test_parse_args():
@@ -136,62 +156,64 @@ def test_create_w_parser(sys_args, app_config, mocker):
     parser.add_argument('-t', '--test', action='store_true')
 
     sys_args += ['-t']
-    app = service.create_app(parser=parser, raw_args=sys_args[1:])
-    assert app['config']['test'] is True
+    app = service.create_app(parser=parser,
+                             raw_args=sys_args[1:],
+                             config_cls=ExtendedConfig)
+    assert app['config'].test is True
 
 
-async def test_furnish(app, client):
-    res = await client.get('/test_app/_service/status')
+async def test_cors(app, client, mocker):
+    res = await client.get('/status')
     assert res.status == 200
     assert 'Access-Control-Allow-Origin' in res.headers
     assert await res.json() == {'status': 'ok'}
 
     # CORS preflight
-    res = await client.options('/test_app/_service/status')
+    res = await client.options('/status')
     assert res.status == 200
     assert 'Access-Control-Allow-Origin' in res.headers
 
-
-async def test_error_cors(app, client, mocker):
-    res = await client.get('/test_app/nonsense')
+    res = await client.get('/nonsense')
     assert res.status == 404
     assert 'Access-Control-Allow-Origin' in res.headers
 
-    mocker.patch(TESTED + '.web.json_response').side_effect = RuntimeError
-    res = await client.get('/test_app/_service/status')
+    res = await client.get('/runtime_error')
     assert res.status == 500
     assert 'Access-Control-Allow-Origin' in res.headers
 
-    mocker.patch(TESTED + '.web.json_response').side_effect = web_exceptions.HTTPUnauthorized(reason='')
-    res = await client.get('/test_app/_service/status')
+    res = await client.get('/auth_error')
     assert res.status == 401
     assert 'Access-Control-Allow-Origin' in res.headers
 
-    mocker.patch(TESTED + '.web.json_response').side_effect = web_exceptions.HTTPUnauthorized(reason='')
-    res = await client.get('/test_app/_service/status')
-    assert res.status == 401
-    assert 'Access-Control-Allow-Origin' in res.headers
-
-    mocker.patch(TESTED + '.web.json_response').side_effect = CancelledError
     with pytest.raises(ServerDisconnectedError):
-        await client.get('/test_app/_service/status')
+        await client.get('/cancelled_error')
 
 
 async def test_multiply(app, client):
-    res = await testing.response(client.post('/test_app/multiply', json={'a': 3, 'b': 2}))
+    res = await testing.response(client.post('/multiply', json={'a': 3, 'b': 2}))
     assert res == {'a': 3, 'b': 2, 'result': pytest.approx(6)}
 
-    res = await testing.response(client.post('/test_app/multiply', json={'a': 3, 'b': 2, 'c': 3}))
+    res = await testing.response(client.post('/multiply', json={'a': 3, 'b': 2, 'c': 3}))
     assert res == {'a': 3, 'b': 2, 'result': pytest.approx(6)}
 
-    await testing.response(client.post('/test_app/multiply', json={}), status=400)
+    await testing.response(client.post('/multiply', json={}), status=400)
 
 
-def test_run(app, mocker):
+async def test_run_app(app, mocker):
     run_mock = mocker.patch(TESTED + '.web.run_app')
 
-    service.run(app)
-    run_mock.assert_called_with(app, host='0.0.0.0', port=1234)
+    async def setup_func():
+        features.add(app, DummyFeature(app))
 
-    service.run(app, False)
-    run_mock.assert_called_with(app, path=testing.matching(r'/tmp/.+/dummy.sock'))
+    service.run_app(app)
+    run_mock.assert_called_with(ANY, host='0.0.0.0', port=1234)
+    assert await run_mock.call_args[0][0] == app
+
+    service.run_app(app, setup=setup_func())
+    run_mock.assert_called_with(ANY, host='0.0.0.0', port=1234)
+    assert await run_mock.call_args[0][0] == app
+    assert features.get(app, DummyFeature)  # Checks whether setup_func() was awaited
+
+    service.run_app(app, listen_http=False)
+    run_mock.assert_called_with(ANY, path=testing.matching(r'/tmp/.+/dummy.sock'))
+    assert await run_mock.call_args[0][0] == app
