@@ -26,13 +26,13 @@ import asyncio
 from contextlib import suppress
 from dataclasses import dataclass, field
 from ssl import CERT_NONE
-from typing import Awaitable, Callable, Literal, Optional
+from typing import Awaitable, Callable, Optional
 
 from aiohttp import web
 from aiomqtt import Client, Message, MqttError, TLSParameters, Will
 from aiomqtt.types import PayloadType
 
-from brewblox_service import brewblox_logger, features, repeater, strex
+from brewblox_service import brewblox_logger, features, models, repeater, strex
 
 LOGGER = brewblox_logger(__name__)
 MQTT_LOGGER = brewblox_logger('aiomqtt')
@@ -80,6 +80,31 @@ class MQTTConfig:
 
     def __str__(self):
         return f'{self.protocol}://{self.host}:{self.port}{self.path}'
+
+
+def _make_client(config: MQTTConfig) -> Client:
+    secure_protocol = config.protocol in ['mqtts', 'wss']
+    tls_params = None
+    will = None
+
+    if secure_protocol:
+        tls_params = TLSParameters(cert_reqs=CERT_NONE)
+
+    if config.client_will:
+        will = Will(**config.client_will)
+
+    client = Client(hostname=config.host,
+                    port=config.port,
+                    transport=config.transport,
+                    websocket_path=config.path,
+                    tls_params=tls_params,
+                    will=will,
+                    logger=MQTT_LOGGER)
+
+    if secure_protocol:
+        client._client.tls_insecure_set(True)
+
+    return client
 
 
 class EventHandler(repeater.RepeaterFeature):
@@ -133,22 +158,22 @@ class EventHandler(repeater.RepeaterFeature):
 
     def __init__(self,
                  app: web.Application,
-                 protocol: Literal['ws', 'wss', 'mqtt', 'mqtts'] = None,
+                 protocol: models.MqttProtocol = None,
                  host: str = None,
                  port: int = None,
                  path: str = None,
                  **kwargs):
         super().__init__(app, **kwargs)
 
-        config = app['config']
-        protocol = protocol or config['mqtt_protocol']
-        host = host or config['mqtt_host']
-        port = port or config['mqtt_port']
-        path = path or config['mqtt_path']
+        config: models.ServiceConfig = app['config']
+        protocol = protocol or config.mqtt_protocol
+        host = host or config.mqtt_host
+        port = port or config.mqtt_port
+        path = path or config.mqtt_path
         self.config = MQTTConfig(protocol, host, port, path)
         self.client: Client = None
 
-        self._ready_ev: asyncio.Event = None
+        self._ready_ev = asyncio.Event()
         self._connect_delay: int = 0
         self._subscribed_topics: list[str] = []
         self._listeners: list[tuple[str, ListenerCallback_]] = []
@@ -157,7 +182,7 @@ class EventHandler(repeater.RepeaterFeature):
         return f'<{type(self).__name__} for {self.config}>'
 
     @property
-    def ready(self) -> Optional[asyncio.Event]:
+    def ready(self) -> asyncio.Event:
         return self._ready_ev
 
     def set_client_will(self, topic: str, message: PayloadType, **kwargs):
@@ -167,31 +192,6 @@ class EventHandler(repeater.RepeaterFeature):
                                        payload=message,
                                        **kwargs)
 
-    @staticmethod
-    def create_client(config: MQTTConfig) -> Client:
-        secure_protocol = config.protocol in ['mqtts', 'wss']
-        tls_params = None
-        will = None
-
-        if secure_protocol:
-            tls_params = TLSParameters(cert_reqs=CERT_NONE)
-
-        if config.client_will:
-            will = Will(**config.client_will)
-
-        client = Client(hostname=config.host,
-                        port=config.port,
-                        transport=config.transport,
-                        websocket_path=config.path,
-                        tls_params=tls_params,
-                        will=will,
-                        logger=MQTT_LOGGER)
-
-        if secure_protocol:
-            client._client.tls_insecure_set(True)
-
-        return client
-
     async def _handle_callback(self, cb: ListenerCallback_, message: Message):
         try:
             await cb(str(message.topic), decoded(message.payload))
@@ -199,8 +199,7 @@ class EventHandler(repeater.RepeaterFeature):
             LOGGER.error(f'Exception handling MQTT callback for {message.topic}: {strex(ex)}')
 
     async def startup(self, app: web.Application):
-        self._ready_ev = asyncio.Event()
-        self.client = self.create_client(self.config)
+        self.client = _make_client(self.config)
 
     async def run(self):
         await asyncio.sleep(self._connect_delay)

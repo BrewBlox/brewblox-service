@@ -29,7 +29,8 @@ from typing import Optional
 
 from aiohttp import web
 
-from brewblox_service import brewblox_logger, features, scheduler, strex
+from brewblox_service import (brewblox_logger, features, models, scheduler,
+                              strex)
 
 LOGGER = brewblox_logger(__name__, dedupe=True)
 
@@ -68,9 +69,11 @@ class RepeaterFeature(features.ServiceFeature):
 
     def __init__(self, app: web.Application, autostart=True, **kwargs):
         super().__init__(app, **kwargs)
+        config: models.ServiceConfig = app['config']
+
         self._autostart: bool = autostart
         self._task: Optional[asyncio.Task] = None
-        self._debug: bool = app['config']['debug']
+        self._debug: bool = config.debug
 
     async def _startup(self, app: web.Application):
         """

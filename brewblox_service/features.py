@@ -158,11 +158,11 @@ class ServiceFeature(ABC):
 
         app = service.create_app(default_name='example')
 
-        scheduler.setup(app)
-        greeter = MyFeature(app)
+        async def setup():
+            scheduler.setup(app)
+            greeter = MyFeature(app)
 
-        service.furnish(app)
-        service.run(app)
+        service.run_app(app, setup())
         # greeter.startup(app) is called now
 
         # Press Ctrl+C to quit

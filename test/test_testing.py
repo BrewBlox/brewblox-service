@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import pytest
 from aiohttp import web
 
-from brewblox_service import service, testing
+from brewblox_service import testing
 
 routes = web.RouteTableDef()
 
@@ -26,18 +26,16 @@ class HealthcheckView(web.View):
 
 
 @pytest.fixture
-def app(app: web.Application, mocker):
+async def app_setup(app: web.Application):
     app.add_routes(routes)
-    service.furnish(app)
-    return app
 
 
 async def test_response(app, client):
-    await testing.response(client.get('/test_app/_service/status'))
+    await testing.response(client.get('/_service/status'))
     with pytest.raises(AssertionError):
-        await testing.response(client.get('/test_app/_service/status'), 400)
-    await testing.response(client.get('/test_app/_testerror'), 405)
-    assert 'BEEP BOOP' in await testing.response(client.post('/test_app/_testerror'), 500)
+        await testing.response(client.get('/_service/status'), 400)
+    await testing.response(client.get('/_testerror'), 405)
+    assert 'BEEP BOOP' in await testing.response(client.post('/_testerror'), 500)
 
 
 def test_matching():
