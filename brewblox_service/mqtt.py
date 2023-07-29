@@ -295,20 +295,6 @@ def fget(app: web.Application) -> EventHandler:
     return features.get(app, EventHandler)
 
 
-def handler(app: web.Application) -> EventHandler:  # pragma: no cover
-    """
-    Deprecated: use fget() instead
-
-    Get registered EventHandler.
-    Requires setup(app) to have been called first.
-
-    Args:
-        app (web.Application):
-            The Aiohttp Application object.
-    """
-    return features.get(app, EventHandler)
-
-
 def set_client_will(app: web.Application,
                     topic: str,
                     message: PayloadType = None,
@@ -328,7 +314,7 @@ def set_client_will(app: web.Application,
         message (str, bytes, None):
             The payload that will be published by the broker on our behalf after disconnecting.
     """
-    handler(app).set_client_will(topic, message, **kwargs)
+    fget(app).set_client_will(topic, message, **kwargs)
 
 
 async def publish(app: web.Application,
@@ -367,12 +353,12 @@ async def publish(app: web.Application,
             Local flag to determine error handling.
             If set to `False`, no exception is raised when the message could not be published.
     """
-    await handler(app).publish(topic,
-                               message,
-                               retain,
-                               qos,
-                               err,
-                               **kwargs)
+    await fget(app).publish(topic,
+                            message,
+                            retain,
+                            qos,
+                            err,
+                            **kwargs)
 
 
 async def subscribe(app: web.Application, topic: str):
@@ -393,7 +379,7 @@ async def subscribe(app: web.Application, topic: str):
             A filter for message topics.
             Can include the '+' and '#' wildcards.
     """
-    await handler(app).subscribe(topic)
+    await fget(app).subscribe(topic)
 
 
 async def listen(app: web.Application, topic: str, callback: ListenerCallback_):
@@ -419,7 +405,7 @@ async def listen(app: web.Application, topic: str, callback: ListenerCallback_):
             It is expected to be an async function that takes two arguments: topic and payload.
 
     """
-    await handler(app).listen(topic, callback)
+    await fget(app).listen(topic, callback)
 
 
 async def unsubscribe(app: web.Application, topic: str):
@@ -437,7 +423,7 @@ async def unsubscribe(app: web.Application, topic: str):
         topic (str):
             Must match the `topic` argument earlier used in `subscribe(topic)`.
     """
-    await handler(app).unsubscribe(topic)
+    await fget(app).unsubscribe(topic)
 
 
 async def unlisten(app: web.Application, topic: str, callback: ListenerCallback_):
@@ -459,4 +445,4 @@ async def unlisten(app: web.Application, topic: str, callback: ListenerCallback_
         callback (Callable[[str, str], Awaitable[None]]):
             Must match the `callback` argument earlier used in `listen(topic, callback)`.
     """
-    await handler(app).unlisten(topic, callback)
+    await fget(app).unlisten(topic, callback)
