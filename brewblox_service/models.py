@@ -5,7 +5,7 @@ from pydantic import BaseModel
 MqttProtocol = Literal['mqtt', 'mqtts', 'ws', 'wss']
 
 
-class ServiceConfig(BaseModel):
+class BaseServiceConfig(BaseModel):
     host: str
     port: int
     name: str

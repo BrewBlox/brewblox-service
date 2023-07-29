@@ -165,7 +165,7 @@ class EventHandler(repeater.RepeaterFeature):
                  **kwargs):
         super().__init__(app, **kwargs)
 
-        config: models.ServiceConfig = app['config']
+        config: models.BaseServiceConfig = app['config']
         protocol = protocol or config.mqtt_protocol
         host = host or config.mqtt_host
         port = port or config.mqtt_port

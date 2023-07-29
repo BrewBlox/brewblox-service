@@ -24,7 +24,7 @@ def broker():
 async def app_setup(app, mocker, broker):
     mocker.patch(TESTED + '.RECONNECT_INTERVAL_S', 0.001)
 
-    config: models.ServiceConfig = app['config']
+    config: models.BaseServiceConfig = app['config']
     config.mqtt_host = '0.0.0.0'
     config.mqtt_protocol = 'mqtt'
     config.mqtt_port = broker['mqtt']

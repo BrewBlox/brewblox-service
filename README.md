@@ -26,7 +26,9 @@ Parses commandline arguments, creates an `aiohttp` application object, and runs 
 The shortest implementation is:
 
 ```python
-app = service.create_app(default_name='my_service')
+parser = service.create_parser('my_service')
+config = service.create_config(parser)
+app = service.create_app(config)
 service.run_app(app)
 ```
 
@@ -37,12 +39,18 @@ Applications can configure their own features, and add new commandline arguments
 Example:
 
 ```python
+class ExtendedConfig(models.BaseServiceConfig):
+    my_arg: str
+
 # Separately creating the parser allows adding arguments to the default set
-parser = service.create_parser(default_name='my_service')
+parser = service.create_parser('my_service')
 parser.add_argument('--my-arg')
 
+# Get a config object from the extended args
+config = service.create_config(parser, model=ExtendedConfig)
+
 # Now create the app
-app = service.create_app(parser=create_parser())
+app = service.create_app(config)
 
 async def setup():
     # Add features for this service

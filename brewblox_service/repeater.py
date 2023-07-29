@@ -69,7 +69,7 @@ class RepeaterFeature(features.ServiceFeature):
 
     def __init__(self, app: web.Application, autostart=True, **kwargs):
         super().__init__(app, **kwargs)
-        config: models.ServiceConfig = app['config']
+        config: models.BaseServiceConfig = app['config']
 
         self._autostart: bool = autostart
         self._task: Optional[asyncio.Task] = None

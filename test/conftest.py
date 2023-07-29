@@ -21,8 +21,8 @@ def log_enabled():
 
 
 @pytest.fixture
-def app_config() -> models.ServiceConfig:
-    return models.ServiceConfig(
+def app_config() -> models.BaseServiceConfig:
+    return models.BaseServiceConfig(
         name='test_app',
         host='0.0.0.0',
         port=1234,
@@ -37,7 +37,7 @@ def app_config() -> models.ServiceConfig:
 
 
 @pytest.fixture
-def sys_args(app_config: models.ServiceConfig) -> list:
+def sys_args(app_config: models.BaseServiceConfig) -> list:
     return [str(v) for v in [
         'app_name',
         '--name', app_config.name,
@@ -53,8 +53,8 @@ def sys_args(app_config: models.ServiceConfig) -> list:
 
 
 @pytest.fixture
-def app(sys_args):
-    app = service.create_app('default_service_name', raw_args=sys_args[1:])
+def app(app_config):
+    app = service.create_app(app_config)
     return app
 
 

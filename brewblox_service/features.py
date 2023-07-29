@@ -156,7 +156,9 @@ class ServiceFeature(ABC):
 
     Example use:
 
-        app = service.create_app(default_name='example')
+        parser = service.create_parser('my_service')
+        config = service.create_config(parser)
+        app = service.create_app(config)
 
         async def setup():
             scheduler.setup(app)

@@ -35,7 +35,7 @@ class MultiplyResult(MultiplyArgs):
     result: float
 
 
-class ExtendedConfig(models.ServiceConfig):
+class ExtendedConfig(models.BaseServiceConfig):
     test: bool
 
 
@@ -133,20 +133,22 @@ def test_no_logging_mute(mocker):
 def test_create_app(sys_args, app_config, mocker):
     raw_args = sys_args[1:] + ['--unknown', 'really']
     m_error = mocker.patch(TESTED + '.LOGGER.error')
-    app = service.create_app(default_name='brewblox', raw_args=raw_args)
+    parser = service.create_parser('brewblox')
+    config = service.create_config(parser, raw_args=raw_args)
+    app = service.create_app(config)
 
     assert app is not None
     assert app['config'] == app_config
+    assert config == app_config
     m_error.assert_called_once_with(testing.matching(r".*\['--unknown', 'really'\]"))
 
 
 def test_create_no_args(sys_args, app_config, mocker):
     mocker.patch(TESTED + '.sys.argv', sys_args)
 
-    with pytest.raises(AssertionError):
-        service.create_app()
-
-    app = service.create_app(default_name='default')
+    parser = service.create_parser('default')
+    config = service.create_config(parser)
+    app = service.create_app(config)
 
     assert app['config'] == app_config
 
@@ -156,10 +158,8 @@ def test_create_w_parser(sys_args, app_config, mocker):
     parser.add_argument('-t', '--test', action='store_true')
 
     sys_args += ['-t']
-    app = service.create_app(parser=parser,
-                             raw_args=sys_args[1:],
-                             config_cls=ExtendedConfig)
-    assert app['config'].test is True
+    config = service.create_config(parser, model=ExtendedConfig, raw_args=sys_args[1:])
+    assert config.test is True
 
 
 async def test_cors(app, client, mocker):
