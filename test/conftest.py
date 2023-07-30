@@ -31,8 +31,8 @@ def app_config() -> models.BaseServiceConfig:
         mqtt_host='eventbus',
         mqtt_port=1883,
         mqtt_path='/eventbus',
-        history_topic='/brewcast/history',
-        state_topic='/brewcast/state',
+        history_topic='brewcast/history',
+        state_topic='brewcast/state',
     )
 
 

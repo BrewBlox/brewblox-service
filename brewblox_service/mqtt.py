@@ -61,8 +61,9 @@ class MQTTConfig:
     host: str
     port: int
     path: str
-    client_will: Optional[dict] = None
+    client_will: Optional[Will] = None
     transport: str = field(init=False)
+    tls_params: Optional[TLSParameters] = field(init=False)
 
     def __post_init__(self):
         if self.protocol not in ['ws', 'wss', 'mqtt', 'mqtts']:
@@ -78,33 +79,27 @@ class MQTTConfig:
         if not self.port:
             self.port = DEFAULT_PORTS[self.protocol]
 
+        if self.protocol in ['mqtts', 'wss']:
+            self.tls_params = TLSParameters(cert_reqs=CERT_NONE)
+        else:
+            self.tls_params = None
+
     def __str__(self):
         return f'{self.protocol}://{self.host}:{self.port}{self.path}'
 
+    def make_client(self) -> Client:
+        client = Client(hostname=self.host,
+                        port=self.port,
+                        transport=self.transport,
+                        websocket_path=self.path,
+                        tls_params=self.tls_params,
+                        will=self.client_will,
+                        logger=MQTT_LOGGER)
 
-def _make_client(config: MQTTConfig) -> Client:
-    secure_protocol = config.protocol in ['mqtts', 'wss']
-    tls_params = None
-    will = None
+        if self.tls_params:
+            client._client.tls_insecure_set(True)
 
-    if secure_protocol:
-        tls_params = TLSParameters(cert_reqs=CERT_NONE)
-
-    if config.client_will:
-        will = Will(**config.client_will)
-
-    client = Client(hostname=config.host,
-                    port=config.port,
-                    transport=config.transport,
-                    websocket_path=config.path,
-                    tls_params=tls_params,
-                    will=will,
-                    logger=MQTT_LOGGER)
-
-    if secure_protocol:
-        client._client.tls_insecure_set(True)
-
-    return client
+        return client
 
 
 class EventHandler(repeater.RepeaterFeature):
@@ -158,25 +153,28 @@ class EventHandler(repeater.RepeaterFeature):
 
     def __init__(self,
                  app: web.Application,
-                 protocol: models.MqttProtocol = None,
-                 host: str = None,
-                 port: int = None,
-                 path: str = None,
+                 protocol: Optional[models.MqttProtocol] = None,
+                 host: Optional[str] = None,
+                 port: Optional[int] = None,
+                 path: Optional[str] = None,
+                 client_will: Optional[Will] = None,
+                 publish_will_before_shutdown: bool = True,
                  **kwargs):
         super().__init__(app, **kwargs)
 
         config: models.BaseServiceConfig = app['config']
-        protocol = protocol or config.mqtt_protocol
-        host = host or config.mqtt_host
-        port = port or config.mqtt_port
-        path = path or config.mqtt_path
-        self.config = MQTTConfig(protocol, host, port, path)
-        self.client: Client = None
+        self.config = MQTTConfig(protocol or config.mqtt_protocol,
+                                 host or config.mqtt_host,
+                                 port or config.mqtt_port,
+                                 path or config.mqtt_path,
+                                 client_will)
+        self.client: Client = self.config.make_client()
 
         self._ready_ev = asyncio.Event()
         self._connect_delay: int = 0
         self._subscribed_topics: list[str] = []
         self._listeners: list[tuple[str, ListenerCallback_]] = []
+        self._publish_will_before_shutdown = publish_will_before_shutdown
 
     def __str__(self):
         return f'<{type(self).__name__} for {self.config}>'
@@ -185,21 +183,11 @@ class EventHandler(repeater.RepeaterFeature):
     def ready(self) -> asyncio.Event:
         return self._ready_ev
 
-    def set_client_will(self, topic: str, message: PayloadType, **kwargs):
-        if self.client:
-            raise RuntimeError('Client will must be set before startup')
-        self.config.client_will = dict(topic=topic,
-                                       payload=message,
-                                       **kwargs)
-
     async def _handle_callback(self, cb: ListenerCallback_, message: Message):
         try:
             await cb(str(message.topic), decoded(message.payload))
         except Exception as ex:
             LOGGER.error(f'Exception handling MQTT callback for {message.topic}: {strex(ex)}')
-
-    async def startup(self, app: web.Application):
-        self.client = _make_client(self.config)
 
     async def run(self):
         await asyncio.sleep(self._connect_delay)
@@ -229,18 +217,23 @@ class EventHandler(repeater.RepeaterFeature):
         finally:
             self._ready_ev.clear()
 
+    async def before_shutdown(self, app: web.Application):
+        if self._publish_will_before_shutdown:
+            with suppress(Exception):
+                await self.client.publish(**vars(self.config.client_will))
+
     async def publish(self,
                       topic: str,
-                      message: PayloadType,
-                      retain=False,
+                      payload: PayloadType,
                       qos=0,
+                      retain=False,
                       err=True,
                       **kwargs):
         try:
             await self.client.publish(topic,
-                                      message,
-                                      retain=retain,
+                                      payload,
                                       qos=qos,
+                                      retain=retain,
                                       timeout=INTERACTION_TIMEOUT_S,
                                       **kwargs)
             LOGGER.debug(f'publish({topic}) -> OK')
@@ -272,15 +265,54 @@ class EventHandler(repeater.RepeaterFeature):
             self._listeners.remove((topic, callback))
 
 
-def setup(app: web.Application, **kwargs):
+def setup(app: web.Application,
+          protocol: Optional[models.MqttProtocol] = None,
+          host: Optional[str] = None,
+          port: Optional[int] = None,
+          path: Optional[str] = None,
+          client_will: Optional[Will] = None,
+          publish_will_before_shutdown: bool = True,
+          **kwargs):
     """
     Initializes the EventHandler in the app context.
 
     Args:
         app (web.Application):
             The Aiohttp Application object.
+
+        protocol (models.MqttProtocol, optional):
+            Override the connection protocol.
+            If not set, app['config']['mqtt_protocol'] is used.
+
+        host (str, optional):
+            Override the broker host.
+            If not set, app['config']['mqtt_host'] is used.
+
+        port (int, optional):
+            Override the broker port.
+            If not set, app['config']['mqtt_port'] is used.
+
+        path (str, optional):
+            Override the broker path for WS connections.
+            If not set, app['config']['mqtt_path'] is used.
+
+        client_will (Will, optional):
+            Set Last Will and Testament for the MQTT connection.
+
+        publish_will_before_shutdown (bool, optional):
+            If set, the handler will attempt to send `client_will`
+            before a normal shutdown.
+
     """
-    features.add(app, EventHandler(app, **kwargs))
+    features.add(app,
+                 EventHandler(app,
+                              protocol=protocol,
+                              host=host,
+                              port=port,
+                              path=path,
+                              client_will=client_will,
+                              publish_will_before_shutdown=publish_will_before_shutdown,
+                              **kwargs))
 
 
 def fget(app: web.Application) -> EventHandler:
@@ -295,33 +327,11 @@ def fget(app: web.Application) -> EventHandler:
     return features.get(app, EventHandler)
 
 
-def set_client_will(app: web.Application,
-                    topic: str,
-                    message: PayloadType = None,
-                    **kwargs):
-    """
-    Set MQTT Last Will and Testament for client.
-    Requires setup(app) to have been called first.
-    Must be called before startup.
-
-    Args:
-        app (web.Application):
-            The Aiohttp Application object.
-
-        topic (str):
-            The MQTT message topic. Cannot include wildcards.
-
-        message (str, bytes, None):
-            The payload that will be published by the broker on our behalf after disconnecting.
-    """
-    fget(app).set_client_will(topic, message, **kwargs)
-
-
 async def publish(app: web.Application,
                   topic: str,
-                  message: PayloadType,
-                  retain=False,
+                  payload: PayloadType,
                   qos=0,
+                  retain=False,
                   err=True,
                   **kwargs):
     """
@@ -337,7 +347,7 @@ async def publish(app: web.Application,
         topic (str):
             The MQTT message topic. Cannot include wildcards.
 
-        message (str, bytes, None):
+        payload (str, bytes, None):
             The message payload.
 
         retain (bool):
@@ -353,11 +363,11 @@ async def publish(app: web.Application,
             Local flag to determine error handling.
             If set to `False`, no exception is raised when the message could not be published.
     """
-    await fget(app).publish(topic,
-                            message,
-                            retain,
-                            qos,
-                            err,
+    await fget(app).publish(topic=topic,
+                            payload=payload,
+                            qos=qos,
+                            retain=retain,
+                            err=err,
                             **kwargs)
 
 

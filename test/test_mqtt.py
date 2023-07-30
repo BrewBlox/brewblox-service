@@ -30,14 +30,16 @@ async def app_setup(app, mocker, broker):
     config.mqtt_port = broker['mqtt']
 
     scheduler.setup(app)
-    mqtt.setup(app, autostart=False)
-    mqtt.set_client_will(app, 'brewcast/rip', None)
+    mqtt.setup(app,
+               autostart=False,
+               client_will=mqtt.Will('brewcast/rip'))
 
     features.add(app,
                  mqtt.EventHandler(app,
                                    protocol='ws',
                                    port=broker['ws'],
-                                   autostart=False),
+                                   autostart=False,
+                                   publish_will_before_shutdown=False),
                  key='secondary')
 
 
@@ -70,15 +72,11 @@ async def test_broker(broker):
 async def test_create_mqtts(app, client, mocker):
     handler = mqtt.EventHandler(app, protocol='mqtts', autostart=False)
     assert handler.config.transport == 'tcp'
-
-    mqtt._make_client(handler.config)
+    assert handler.config.tls_params is not None
 
 
 async def test_disconnected(app, client, mocker):
     handler = mqtt.fget(app)
-
-    with pytest.raises(RuntimeError):
-        handler.set_client_will('brewcast/nope', None)
 
     with pytest.raises(ConnectionError):
         await handler.publish('test', '')
@@ -110,11 +108,11 @@ class CallbackRecorder:
 
 
 async def test_listen(app, client):
-    handler = mqtt.fget(app)
-    secondary = features.get(app, mqtt.EventHandler, 'secondary')
+    primary: mqtt.EventHandler = mqtt.fget(app)
+    secondary: mqtt.EventHandler = features.get(app, mqtt.EventHandler, 'secondary')
 
-    await handler.start()
-    await wait_ready(handler)
+    await primary.start()
+    await wait_ready(primary)
 
     # Set listeners with varying wildcards
     # Errors in the callback should not interrupt
