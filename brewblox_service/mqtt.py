@@ -206,7 +206,10 @@ class EventHandler(repeater.RepeaterFeature):
                     async for message in messages:  # pragma: no cover
                         matching = [cb
                                     for (topic, cb) in self._listeners
-                                    if message.topic.matches(topic)]
+                                    if message.topic.matches(topic)
+                                    # Workaround for a bug: https://github.com/sbtinstruments/aiomqtt/issues/239
+                                    # TODO(Bob) remove when fixed
+                                    or (topic.endswith('/#') and message.topic.matches(topic[:-2]))]
 
                         for cb in matching:
                             asyncio.create_task(self._handle_callback(cb, message))
@@ -337,7 +340,7 @@ async def publish(app: web.Application,
     """
     Publish a new event message.
 
-    Shortcut for `handler(app).subscribe(topic, message)`.
+    Shortcut for `fget(app).subscribe(topic, message)`.
     Requires setup(app) to have been called first.
 
     Args:
