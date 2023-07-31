@@ -9,7 +9,7 @@ import logging
 import pytest
 from aiohttp import test_utils
 
-from brewblox_service import models, service
+from brewblox_service import models, service, testing
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -72,3 +72,13 @@ async def client(app, app_setup, aiohttp_client, aiohttp_server):
     test_server: test_utils.TestServer = await aiohttp_server(app)
     test_client: test_utils.TestClient = await aiohttp_client(test_server)
     return test_client
+
+
+@pytest.fixture(scope='session')
+def broker():
+    with testing.docker_container(
+        name='mqtt-test-broker',
+        ports={'mqtt': 1883, 'ws': 15675},
+        args=['ghcr.io/brewblox/mosquitto:develop'],
+    ) as ports:
+        yield ports

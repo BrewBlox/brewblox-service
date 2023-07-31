@@ -9,15 +9,9 @@ from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
-from brewblox_service import features, models, mqtt, scheduler, testing
+from brewblox_service import features, models, mqtt, scheduler
 
 TESTED = mqtt.__name__
-
-
-@pytest.fixture(scope='module')
-def broker():
-    with testing.mqtt_broker() as ports:
-        yield ports
 
 
 @pytest.fixture

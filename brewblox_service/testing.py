@@ -62,14 +62,14 @@ def find_free_port():
 
 
 @contextmanager
-def mqtt_broker(name='mqtt-test-broker', image='ghcr.io/brewblox/mosquitto:develop'):
-    """
-    Spawns and closes an MQTT broker image.
-    To prevent conflict, it listens on random free ports.
-    The context manager yields a dict containing the randomly selected port numbers.
-    """
-    mqtt_port = find_free_port()
-    ws_port = find_free_port()
+def docker_container(name: str, ports: dict[str, int], args: list[str]):
+    published = {}
+    publish_args = []
+    for key, src_port in ports.items():
+        dest_port = find_free_port()
+        published[key] = dest_port
+        publish_args.append(f'--publish={dest_port}:{src_port}')
+
     run(['docker', 'stop', name], stdout=DEVNULL)
     run(
         [
@@ -78,13 +78,12 @@ def mqtt_broker(name='mqtt-test-broker', image='ghcr.io/brewblox/mosquitto:devel
             '--rm',
             '--detach',
             f'--name={name}',
-            f'--publish={mqtt_port}:1883',
-            f'--publish={ws_port}:15675',
-            image,
+            *publish_args,
+            *args,
         ],
         check=True)
     try:
-        yield {'mqtt': mqtt_port, 'ws': ws_port}
+        yield published
     except Exception:
         run(['docker', 'ps'])
         raise

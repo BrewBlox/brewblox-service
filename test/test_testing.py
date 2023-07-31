@@ -50,13 +50,18 @@ def test_matching():
     mock.assert_called_with(obj)
 
 
-def test_broker():
+def test_docker_container():
     def active_containers():
         return check_output(['docker', 'ps', '--format={{.Names}}']).decode()
 
     with pytest.raises(RuntimeError):
-        with testing.mqtt_broker('broker-test-broker'):
+        with testing.docker_container(
+            name='broker-test-broker',
+            ports={'mqtt': 1883},
+            args=['ghcr.io/brewblox/mosquitto:develop'],
+        ) as ports:
             assert 'broker-test-broker' in active_containers()
+            assert ports['mqtt'] != 1883
             raise RuntimeError('Boo!')
 
     assert 'broker-test-broker' not in active_containers()
