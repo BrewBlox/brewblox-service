@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "brewblox-service"
-version = "3.1.1"
+version = "3.1.2"
 description = "Scaffolding for Brewblox backend services"
 authors = ["BrewPi <development@brewpi.com>"]
 license = "GPL-3.0"
