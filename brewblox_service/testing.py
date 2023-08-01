@@ -70,7 +70,7 @@ def docker_container(name: str, ports: dict[str, int], args: list[str]):
         published[key] = dest_port
         publish_args.append(f'--publish={dest_port}:{src_port}')
 
-    run(['docker', 'stop', name], stdout=DEVNULL)
+    run(['docker', 'stop', name], stdout=DEVNULL, stderr=DEVNULL)
     run(
         [
             'docker',
@@ -84,9 +84,5 @@ def docker_container(name: str, ports: dict[str, int], args: list[str]):
         check=True)
     try:
         yield published
-    except Exception:
-        run(['docker', 'ps'])
-        raise
     finally:
-        run(['docker', 'logs', '--timestamps', name])
-        run(['docker', 'stop', name], stdout=DEVNULL)
+        run(['docker', 'stop', name], stdout=DEVNULL, stderr=DEVNULL)
