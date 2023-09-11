@@ -26,7 +26,7 @@ from typing import Awaitable, Optional, TypeVar
 from aiohttp import web
 from aiohttp_pydantic import oas
 
-from brewblox_service import brewblox_logger, cors, features, models
+from brewblox_service import brewblox_logger, features, middlewares, models
 
 LOGGER = brewblox_logger(__name__)
 
@@ -145,10 +145,9 @@ def create_app(config: models.BaseServiceConfig) -> web.Application:
             This Application is not yet running.
 
     """
-    app = web.Application()
+    app = web.Application(middlewares=[middlewares.cors_middleware,
+                                       middlewares.error_middleware])
     app['config'] = config
-
-    app.middlewares.append(cors.cors_middleware)
     oas.setup(app, url_prefix='/api/doc', title_spec=config.name)
 
     return app
