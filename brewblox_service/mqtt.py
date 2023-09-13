@@ -64,6 +64,7 @@ class MQTTConfig:
     client_will: Optional[Will] = None
     transport: str = field(init=False)
     tls_params: Optional[TLSParameters] = field(init=False)
+    tls_insecure: Optional[bool] = field(init=False)
 
     def __post_init__(self):
         if self.protocol not in ['ws', 'wss', 'mqtt', 'mqtts']:
@@ -81,8 +82,10 @@ class MQTTConfig:
 
         if self.protocol in ['mqtts', 'wss']:
             self.tls_params = TLSParameters(cert_reqs=CERT_NONE)
+            self.tls_insecure = True
         else:
             self.tls_params = None
+            self.tls_insecure = None
 
     def __str__(self):
         return f'{self.protocol}://{self.host}:{self.port}{self.path}'
@@ -93,11 +96,9 @@ class MQTTConfig:
                         transport=self.transport,
                         websocket_path=self.path,
                         tls_params=self.tls_params,
+                        tls_insecure=self.tls_insecure,
                         will=self.client_will,
                         logger=MQTT_LOGGER)
-
-        if self.tls_params:
-            client._client.tls_insecure_set(True)
 
         return client
 
@@ -203,13 +204,10 @@ class EventHandler(repeater.RepeaterFeature):
                     LOGGER.debug(f'{self} is ready')
                     self._ready_ev.set()
 
-                    async for message in messages:  # pragma: no cover
+                    async for message in messages:  # pragma: no branch
                         matching = [cb
                                     for (topic, cb) in self._listeners
-                                    if message.topic.matches(topic)
-                                    # Workaround for a bug: https://github.com/sbtinstruments/aiomqtt/issues/239
-                                    # TODO(Bob) remove when fixed
-                                    or (topic.endswith('/#') and message.topic.matches(topic[:-2]))]
+                                    if message.topic.matches(topic)]
 
                         for cb in matching:
                             asyncio.create_task(self._handle_callback(cb, message))
